@@ -1,32 +1,102 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Stethoscope, Eye, EyeOff, CheckCircle } from "lucide-react"
+import { useAuth } from "@/lib/AuthContext"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { register: registerUser, user, isAuthenticated } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [userType, setUserType] = useState("owner")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     password: "",
+    // Doctor-specific fields
+    specialty: "",
+    licenseNumber: "",
+    experience: "",
+    consultationFee: "",
+    qualifications: "",
+    city: "",
+    state: "",
   })
 
-  const handleSubmit = (e) => {
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "owner") {
+        router.push("/dashboard")
+      } else if (user.role === "doctor") {
+        router.push("/doctor-dashboard")
+      } else if (user.role === "admin") {
+        router.push("/admin")
+      }
+    }
+  }, [isAuthenticated, user, router])
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (userType === "owner") {
-      router.push("/dashboard")
-    } else {
-      router.push("/doctor-dashboard")
+    setLoading(true)
+    setError("")
+
+    try {
+      const userData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        role: userType,
+      }
+
+      // Add doctor-specific fields if registering as doctor
+      if (userType === "doctor") {
+        userData.specialty = formData.specialty
+        userData.licenseNumber = formData.licenseNumber
+        userData.experience = parseInt(formData.experience) || 0
+        userData.consultationFee = parseFloat(formData.consultationFee) || 0
+        userData.qualifications = formData.qualifications
+        userData.location = {
+          city: formData.city,
+          state: formData.state
+        }
+      }
+
+      await registerUser(userData)
+
+      if (userType === "owner") {
+        router.push("/dashboard")
+      } else {
+        router.push("/doctor-dashboard")
+      }
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
+
+  const specialties = [
+    "General Veterinarian",
+    "Feline Specialist",
+    "Canine Specialist",
+    "Emergency Care",
+    "Dermatology",
+    "Orthopedic Surgery",
+    "Cardiology",
+    "Dental",
+    "Other"
+  ]
 
   const benefits = [
     "Book home consultations easily",
@@ -52,6 +122,12 @@ export default function RegisterPage() {
           <p className="mt-2 text-muted-foreground">
             Join Vetic to access quality pet healthcare
           </p>
+
+          {error && (
+            <div className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           {/* User Type Selector */}
           <div className="mt-8 flex rounded-lg border border-border p-1">
@@ -130,8 +206,115 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full">
-              Create Account
+            {/* Doctor-specific fields */}
+            {userType === "doctor" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="specialty">Specialty</Label>
+                  <Select
+                    value={formData.specialty}
+                    onValueChange={(value) => setFormData({ ...formData, specialty: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your specialty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {specialties.map((specialty) => (
+                        <SelectItem key={specialty} value={specialty}>
+                          {specialty}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="licenseNumber">License Number</Label>
+                  <Input
+                    id="licenseNumber"
+                    type="text"
+                    placeholder="Enter your veterinary license number"
+                    value={formData.licenseNumber}
+                    onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="experience">Years of Experience</Label>
+                    <Input
+                      id="experience"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={formData.experience}
+                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="consultationFee">Consultation Fee ($)</Label>
+                    <Input
+                      id="consultationFee"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="75.00"
+                      value={formData.consultationFee}
+                      onChange={(e) => setFormData({ ...formData, consultationFee: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="qualifications">Qualifications</Label>
+                  <Input
+                    id="qualifications"
+                    type="text"
+                    placeholder="e.g., DVM - Cornell University, 2015"
+                    value={formData.qualifications}
+                    onChange={(e) => setFormData({ ...formData, qualifications: e.target.value })}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter your degree, institution, and year
+                  </p>
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      type="text"
+                      placeholder="New York"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      type="text"
+                      placeholder="NY"
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Creating Account..." : "Create Account"}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">

@@ -11,8 +11,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
+import { useAuth } from "@/lib/AuthContext"
 
 export function DashboardHeader({ onMenuClick }) {
+  const { user, logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+  }
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background px-4 lg:px-6">
       {/* Mobile menu button */}
@@ -45,7 +51,7 @@ export function DashboardHeader({ onMenuClick }) {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                 <User className="h-4 w-4 text-primary" />
               </div>
-              <span className="hidden md:block">John Doe</span>
+              <span className="hidden md:block">{user?.name || "User"}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -58,8 +64,8 @@ export function DashboardHeader({ onMenuClick }) {
               <Link href="/dashboard/pets">My Pets</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/login">Sign Out</Link>
+            <DropdownMenuItem onClick={handleLogout}>
+              Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

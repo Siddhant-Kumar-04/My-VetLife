@@ -1,31 +1,58 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Stethoscope, Eye, EyeOff } from "lucide-react"
+import { useAuth } from "@/lib/AuthContext"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login, user, isAuthenticated } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
-  const [userType, setUserType] = useState("owner")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
 
-  const handleSubmit = (e) => {
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "owner") {
+        router.push("/dashboard")
+      } else if (user.role === "doctor") {
+        router.push("/doctor-dashboard")
+      } else if (user.role === "admin") {
+        router.push("/admin")
+      }
+    }
+  }, [isAuthenticated, user, router])
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Demo routing based on user type
-    if (userType === "owner") {
-      router.push("/dashboard")
-    } else if (userType === "doctor") {
-      router.push("/doctor-dashboard")
-    } else {
-      router.push("/admin")
+    setLoading(true)
+    setError("")
+
+    try {
+      const response = await login(formData)
+      
+      // Route based on user role
+      if (response.user.role === "owner") {
+        router.push("/dashboard")
+      } else if (response.user.role === "doctor") {
+        router.push("/doctor-dashboard")
+      } else if (response.user.role === "admin") {
+        router.push("/admin")
+      }
+    } catch (err) {
+      setError(err.message || "Login failed. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -47,23 +74,11 @@ export default function LoginPage() {
             Sign in to your account to continue
           </p>
 
-          {/* User Type Selector */}
-          <div className="mt-8 flex rounded-lg border border-border p-1">
-            {["owner", "doctor", "admin"].map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setUserType(type)}
-                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  userType === type
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {type === "owner" ? "Pet Owner" : type === "doctor" ? "Doctor" : "Admin"}
-              </button>
-            ))}
-          </div>
+          {error && (
+            <div className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div className="space-y-2">
@@ -105,8 +120,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full">
-              Sign In
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
@@ -14,108 +14,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Star, MapPin, Clock, Filter, Stethoscope, Award, CheckCircle } from "lucide-react"
+import { Search, Star, MapPin, Clock, Filter, Stethoscope, Award, CheckCircle, Loader2 } from "lucide-react"
+import { api } from "@/lib/api"
 
 export default function DoctorsPage() {
+  const [doctors, setDoctors] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [specialty, setSpecialty] = useState("all")
   const [sortBy, setSortBy] = useState("rating")
 
-  const doctors = [
-    {
-      id: 1,
-      name: "Dr. Sarah Wilson",
-      specialty: "General Veterinarian",
-      qualifications: "DVM, MS",
-      experience: "8 years",
-      rating: 4.9,
-      reviews: 124,
-      location: "Manhattan, NY",
-      availability: "Available Today",
-      consultationFee: "$75",
-      verified: true,
-    },
-    {
-      id: 2,
-      name: "Dr. Michael Chen",
-      specialty: "Feline Specialist",
-      qualifications: "DVM, ABVP (Feline)",
-      experience: "12 years",
-      rating: 4.8,
-      reviews: 98,
-      location: "Brooklyn, NY",
-      availability: "Next Available: Tomorrow",
-      consultationFee: "$90",
-      verified: true,
-    },
-    {
-      id: 3,
-      name: "Dr. Emily Rodriguez",
-      specialty: "Canine Specialist",
-      qualifications: "DVM, CVA",
-      experience: "6 years",
-      rating: 4.7,
-      reviews: 76,
-      location: "Queens, NY",
-      availability: "Available Today",
-      consultationFee: "$80",
-      verified: true,
-    },
-    {
-      id: 4,
-      name: "Dr. James Brown",
-      specialty: "Emergency Care",
-      qualifications: "DVM, DACVECC",
-      experience: "15 years",
-      rating: 4.9,
-      reviews: 156,
-      location: "Bronx, NY",
-      availability: "24/7 Emergency",
-      consultationFee: "$120",
-      verified: true,
-    },
-    {
-      id: 5,
-      name: "Dr. Lisa Park",
-      specialty: "Dermatology",
-      qualifications: "DVM, DACVD",
-      experience: "10 years",
-      rating: 4.6,
-      reviews: 89,
-      location: "Manhattan, NY",
-      availability: "Next Available: Jan 26",
-      consultationFee: "$95",
-      verified: true,
-    },
-    {
-      id: 6,
-      name: "Dr. David Kim",
-      specialty: "Orthopedic Surgery",
-      qualifications: "DVM, DACVS",
-      experience: "14 years",
-      rating: 4.8,
-      reviews: 112,
-      location: "Brooklyn, NY",
-      availability: "By Appointment",
-      consultationFee: "$150",
-      verified: true,
-    },
-  ]
+  useEffect(() => {
+    fetchDoctors()
+  }, [specialty, sortBy])
 
-  const filteredDoctors = doctors
-    .filter((doctor) => {
-      const matchesSearch =
-        doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesSpecialty = specialty === "all" || doctor.specialty === specialty
-      return matchesSearch && matchesSpecialty
-    })
-    .sort((a, b) => {
-      if (sortBy === "rating") return b.rating - a.rating
-      if (sortBy === "reviews") return b.reviews - a.reviews
-      if (sortBy === "experience") return parseInt(b.experience) - parseInt(a.experience)
-      return 0
-    })
+  const fetchDoctors = async () => {
+    try {
+      setLoading(true)
+      const params = {}
+      if (specialty !== "all") params.specialty = specialty
+      if (sortBy) params.sortBy = sortBy
+
+      const response = await api.getDoctors(params)
+      setDoctors(response.data || [])
+    } catch (error) {
+      console.error("Failed to fetch doctors:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredDoctors = doctors.filter((doctor) => {
+    const doctorName = doctor.user?.name || ""
+    const matchesSearch =
+      doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesSearch
+  })
 
   const specialties = [
     "General Veterinarian",
@@ -181,10 +116,26 @@ export default function DoctorsPage() {
           Showing {filteredDoctors.length} veterinarians
         </p>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filteredDoctors.length === 0 && (
+          <div className="rounded-lg border border-border p-12 text-center">
+            <Stethoscope className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold">No doctors found</h3>
+            <p className="text-muted-foreground">Try adjusting your filters</p>
+          </div>
+        )}
+
         {/* Doctor Cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredDoctors.map((doctor) => (
-            <Card key={doctor.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+            <Card key={doctor._id} className="overflow-hidden transition-shadow hover:shadow-lg">
               <CardContent className="p-0">
                 {/* Doctor Header */}
                 <div className="bg-primary/5 p-6">
@@ -194,13 +145,15 @@ export default function DoctorsPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-foreground">{doctor.name}</h3>
-                        {doctor.verified && (
+                        <h3 className="font-semibold text-foreground">{doctor.user?.name}</h3>
+                        {doctor.isVerified && (
                           <CheckCircle className="h-4 w-4 text-primary" />
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{doctor.specialty}</p>
-                      <p className="text-xs text-muted-foreground">{doctor.qualifications}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doctor.qualifications?.[0]?.degree || "DVM"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -211,26 +164,32 @@ export default function DoctorsPage() {
                   <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-accent text-accent" />
-                      <span className="font-medium text-foreground">{doctor.rating}</span>
+                      <span className="font-medium text-foreground">
+                        {doctor.rating ? doctor.rating.toFixed(1) : "0.0"}
+                      </span>
                       <span className="text-sm text-muted-foreground">
-                        ({doctor.reviews} reviews)
+                        ({doctor.reviewCount || 0} reviews)
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Award className="h-4 w-4" />
-                      {doctor.experience}
+                      {doctor.experience || 0} years
                     </div>
                   </div>
 
                   {/* Location & Availability */}
                   <div className="mb-4 space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      {doctor.location}
-                    </div>
+                    {(doctor.location?.city || doctor.location?.state) && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        {doctor.location?.city}
+                        {doctor.location?.city && doctor.location?.state && ", "}
+                        {doctor.location?.state}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-primary" />
-                      <span className="font-medium text-primary">{doctor.availability}</span>
+                      <span className="font-medium text-primary">Available for booking</span>
                     </div>
                   </div>
 
@@ -238,10 +197,12 @@ export default function DoctorsPage() {
                   <div className="flex items-center justify-between border-t border-border pt-4">
                     <div>
                       <span className="text-sm text-muted-foreground">Consultation Fee</span>
-                      <p className="text-lg font-bold text-foreground">{doctor.consultationFee}</p>
+                      <p className="text-lg font-bold text-foreground">
+                        ${doctor.consultationFee || 0}
+                      </p>
                     </div>
                     <Button asChild>
-                      <Link href={`/doctors/${doctor.id}`}>Book Now</Link>
+                      <Link href={`/doctors/${doctor._id}`}>Book Now</Link>
                     </Button>
                   </div>
                 </div>

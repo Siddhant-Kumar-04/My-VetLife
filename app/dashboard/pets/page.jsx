@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,69 +21,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Dog, Cat, Plus, Calendar, Syringe, FileText, Edit, Trash2 } from "lucide-react"
+import { Dog, Cat, Plus, Calendar, Syringe, FileText, Edit, Trash2, Loader2 } from "lucide-react"
+import { api } from "@/lib/api"
 
 export default function PetsPage() {
-  const [pets, setPets] = useState([
-    {
-      id: 1,
-      name: "Max",
-      type: "dog",
-      breed: "Golden Retriever",
-      age: "3 years",
-      weight: "30 kg",
-      lastVisit: "Dec 15, 2025",
-      vaccinations: 5,
-    },
-    {
-      id: 2,
-      name: "Luna",
-      type: "cat",
-      breed: "Persian",
-      age: "2 years",
-      weight: "4 kg",
-      lastVisit: "Jan 10, 2026",
-      vaccinations: 4,
-    },
-    {
-      id: 3,
-      name: "Buddy",
-      type: "dog",
-      breed: "Labrador",
-      age: "5 years",
-      weight: "28 kg",
-      lastVisit: "Nov 20, 2025",
-      vaccinations: 6,
-    },
-  ])
-
+  const [pets, setPets] = useState([])
+  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [newPet, setNewPet] = useState({
     name: "",
     type: "dog",
     breed: "",
-    age: "",
-    weight: "",
+    age: { years: 0, months: 0 },
+    weight: { value: 0, unit: "kg" },
   })
 
-  const handleAddPet = () => {
-    if (newPet.name && newPet.breed) {
-      setPets([
-        ...pets,
-        {
-          id: pets.length + 1,
-          ...newPet,
-          lastVisit: "Not yet",
-          vaccinations: 0,
-        },
-      ])
-      setNewPet({ name: "", type: "dog", breed: "", age: "", weight: "" })
-      setDialogOpen(false)
+  useEffect(() => {
+    fetchPets()
+  }, [])
+
+  const fetchPets = async () => {
+    try {
+      setLoading(true)
+      const response = await api.getPets()
+      setPets(response.data || [])
+    } catch (error) {
+      console.error("Failed to fetch pets:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleDeletePet = (id) => {
-    setPets(pets.filter((pet) => pet.id !== id))
+  const handleAddPet = async () => {
+    if (!newPet.name || !newPet.breed) return
+
+    try {
+      setSubmitting(true)
+      await api.createPet(newPet)
+      await fetchPets()
+      setNewPet({ name: "", type: "dog", breed: "", age: { years: 0, months: 0 }, weight: { value: 0, unit: "kg" } })
+      setDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to create pet:", error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeletePet = async (id) => {
+    if (!confirm("Are you sure you want to delete this pet?")) return
+
+    try {
+      await api.deletePet(id)
+      setPets(pets.filter((pet) => pet._id !== id))
+    } catch (error) {
+      console.error("Failed to delete pet:", error)
+    }
   }
 
   const getPetIcon = (type) => {
@@ -157,38 +151,56 @@ export default function PetsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="pet-age">Age</Label>
+                  <Label htmlFor="pet-age">Age (Years)</Label>
                   <Input
                     id="pet-age"
-                    placeholder="e.g., 2 years"
-                    value={newPet.age}
-                    onChange={(e) => setNewPet({ ...newPet, age: e.target.value })}
+                    type="number"
+                    placeholder="Years"
+                    value={newPet.age.years}
+                    onChange={(e) => setNewPet({ ...newPet, age: { ...newPet.age, years: parseInt(e.target.value) || 0 } })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pet-weight">Weight</Label>
+                  <Label htmlFor="pet-weight">Weight (kg)</Label>
                   <Input
                     id="pet-weight"
-                    placeholder="e.g., 10 kg"
-                    value={newPet.weight}
-                    onChange={(e) => setNewPet({ ...newPet, weight: e.target.value })}
+                    type="number"
+                    placeholder="Weight"
+                    value={newPet.weight.value}
+                    onChange={(e) => setNewPet({ ...newPet, weight: { ...newPet.weight, value: parseFloat(e.target.value) || 0 } })}
                   />
                 </div>
               </div>
-              <Button onClick={handleAddPet} className="w-full">
-                Add Pet
+              <Button onClick={handleAddPet} className="w-full" disabled={submitting}>
+                {submitting ? "Adding..." : "Add Pet"}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && pets.length === 0 && (
+        <div className="rounded-lg border border-border p-12 text-center">
+          <Dog className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-semibold">No pets yet</h3>
+          <p className="text-muted-foreground">Add your first pet to get started</p>
+        </div>
+      )}
+
       {/* Pets Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {pets.map((pet) => {
           const PetIcon = getPetIcon(pet.type)
           return (
-            <Card key={pet.id} className="overflow-hidden">
+            <Card key={pet._id} className="overflow-hidden">
               <CardHeader className="bg-primary/5 pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
@@ -201,15 +213,11 @@ export default function PetsPage() {
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">Edit</span>
-                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => handleDeletePet(pet.id)}
+                      onClick={() => handleDeletePet(pet._id)}
                     >
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Delete</span>
@@ -221,23 +229,18 @@ export default function PetsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">Age</p>
-                    <p className="font-medium text-foreground">{pet.age}</p>
+                    <p className="font-medium text-foreground">{pet.age?.years || 0} years {pet.age?.months || 0} months</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">Weight</p>
-                    <p className="font-medium text-foreground">{pet.weight}</p>
+                    <p className="font-medium text-foreground">{pet.weight?.value || 0} {pet.weight?.unit || "kg"}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs">
-                    <Calendar className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-muted-foreground">Last visit:</span>
-                    <span className="font-medium text-foreground">{pet.lastVisit}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs">
                     <Syringe className="h-3.5 w-3.5 text-primary" />
-                    <span className="font-medium text-foreground">{pet.vaccinations} vaccines</span>
+                    <span className="font-medium text-foreground">{pet.vaccinations?.length || 0} vaccines</span>
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,56 +14,44 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Loader2,
 } from "lucide-react"
+import { api } from "@/lib/api"
 
 export default function AppointmentsPage() {
-  const [appointments] = useState([
-    {
-      id: 1,
-      doctor: "Dr. Sarah Wilson",
-      specialty: "General Veterinarian",
-      pet: "Max (Golden Retriever)",
-      date: "Jan 25, 2026",
-      time: "10:00 AM",
-      location: "123 Pet Street, New York",
-      phone: "+1 (555) 123-4567",
-      status: "confirmed",
-    },
-    {
-      id: 2,
-      doctor: "Dr. Michael Chen",
-      specialty: "Feline Specialist",
-      pet: "Luna (Persian Cat)",
-      date: "Jan 28, 2026",
-      time: "2:30 PM",
-      location: "456 Animal Ave, New York",
-      phone: "+1 (555) 987-6543",
-      status: "pending",
-    },
-    {
-      id: 3,
-      doctor: "Dr. Emily Rodriguez",
-      specialty: "General Veterinarian",
-      pet: "Buddy (Labrador)",
-      date: "Jan 15, 2026",
-      time: "11:00 AM",
-      location: "789 Vet Road, New York",
-      phone: "+1 (555) 456-7890",
-      status: "completed",
-      rating: 5,
-    },
-    {
-      id: 4,
-      doctor: "Dr. James Brown",
-      specialty: "Canine Specialist",
-      pet: "Max (Golden Retriever)",
-      date: "Jan 10, 2026",
-      time: "3:00 PM",
-      location: "321 Care Lane, New York",
-      phone: "+1 (555) 321-0987",
-      status: "cancelled",
-    },
-  ])
+  const [appointments, setAppointments] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [])
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true)
+      const response = await api.getAppointments()
+      setAppointments(response.data || [])
+    } catch (error) {
+      console.error("Failed to fetch appointments:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelAppointment = async (id) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return
+
+    try {
+      await api.cancelAppointment(id, "Cancelled by user")
+      await fetchAppointments()
+    } catch (error) {
+      console.error("Failed to cancel appointment:", error)
+    }
+  }
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -114,9 +102,13 @@ export default function AppointmentsPage() {
               {getStatusIcon(appointment.status)}
             </div>
             <div className="space-y-1">
-              <h3 className="font-semibold text-foreground">{appointment.doctor}</h3>
-              <p className="text-sm text-muted-foreground">{appointment.specialty}</p>
-              <p className="text-sm font-medium text-foreground">{appointment.pet}</p>
+              <h3 className="font-semibold text-foreground">
+                {appointment.doctor?.user?.name || "Doctor"}
+              </h3>
+              <p className="text-sm text-muted-foreground">{appointment.doctor?.specialty}</p>
+              <p className="text-sm font-medium text-foreground">
+                {appointment.pet?.name} ({appointment.pet?.breed})
+              </p>
             </div>
           </div>
           <span
@@ -131,23 +123,15 @@ export default function AppointmentsPage() {
         <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>{appointment.date}</span>
+            <span>{formatDate(appointment.appointmentDate)}</span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span>{appointment.time}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            <span className="truncate">{appointment.location}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Phone className="h-4 w-4" />
-            <span>{appointment.phone}</span>
+            <span>{appointment.appointmentTime}</span>
           </div>
         </div>
 
-        {appointment.status === "completed" && (
+        {appointment.status === "completed" && appointment.rating && (
           <div className="mt-4 flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Your Rating:</span>
             <div className="flex gap-0.5">
@@ -155,7 +139,7 @@ export default function AppointmentsPage() {
                 <Star
                   key={i}
                   className={`h-4 w-4 ${
-                    i < (appointment.rating || 0)
+                    i < (appointment.rating?.value || 0)
                       ? "fill-accent text-accent"
                       : "text-muted-foreground"
                   }`}
@@ -167,17 +151,14 @@ export default function AppointmentsPage() {
 
         <div className="mt-4 flex flex-wrap gap-2">
           {(appointment.status === "confirmed" || appointment.status === "pending") && (
-            <>
-              <Button variant="outline" size="sm" className="bg-transparent">
-                Reschedule
-              </Button>
-              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive bg-transparent">
-                Cancel
-              </Button>
-            </>
-          )}
-          {appointment.status === "completed" && !appointment.rating && (
-            <Button size="sm">Rate Doctor</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-destructive hover:text-destructive bg-transparent"
+              onClick={() => handleCancelAppointment(appointment._id)}
+            >
+              Cancel
+            </Button>
           )}
         </div>
       </CardContent>
@@ -197,8 +178,14 @@ export default function AppointmentsPage() {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="upcoming" className="space-y-6">
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+
+      {!loading && (
+        <Tabs defaultValue="upcoming" className="space-y-6">
         <TabsList>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           <TabsTrigger value="past">Past</TabsTrigger>
@@ -211,13 +198,13 @@ export default function AppointmentsPage() {
               <CardHeader>
                 <CardTitle>No upcoming appointments</CardTitle>
                 <CardDescription>
-                  Book a consultation with a veterinarian to see your appointments here
+                  Your scheduled appointments will appear here
                 </CardDescription>
               </CardHeader>
             </Card>
           ) : (
             filterAppointments("upcoming").map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} />
+              <AppointmentCard key={appointment._id} appointment={appointment} />
             ))
           )}
         </TabsContent>
@@ -234,17 +221,19 @@ export default function AppointmentsPage() {
             </Card>
           ) : (
             filterAppointments("past").map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} />
+              <AppointmentCard key={appointment._id} appointment={appointment} />
             ))
           )}
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
           {appointments.map((appointment) => (
-            <AppointmentCard key={appointment.id} appointment={appointment} />
+            <AppointmentCard key={appointment._id} appointment={appointment} />
           ))}
         </TabsContent>
       </Tabs>
+      )}
     </div>
   )
 }
+   

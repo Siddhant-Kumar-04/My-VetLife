@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,69 +26,60 @@ import {
   TrendingUp,
   User,
   MoreVertical,
+  Loader2,
 } from "lucide-react"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/AuthContext"
 
 export default function DoctorDashboardPage() {
-  const [appointments, setAppointments] = useState([
-    {
-      id: 1,
-      patient: "Max",
-      owner: "John Doe",
-      type: "Golden Retriever",
-      date: "Jan 25, 2026",
-      time: "10:00 AM",
-      reason: "Annual checkup",
-      status: "pending",
-    },
-    {
-      id: 2,
-      patient: "Luna",
-      owner: "Sarah Smith",
-      type: "Persian Cat",
-      date: "Jan 25, 2026",
-      time: "11:30 AM",
-      reason: "Vaccination",
-      status: "pending",
-    },
-    {
-      id: 3,
-      patient: "Buddy",
-      owner: "Mike Johnson",
-      type: "Labrador",
-      date: "Jan 25, 2026",
-      time: "2:00 PM",
-      reason: "Skin allergy",
-      status: "confirmed",
-    },
-    {
-      id: 4,
-      patient: "Whiskers",
-      owner: "Emily Brown",
-      type: "Siamese Cat",
-      date: "Jan 24, 2026",
-      time: "3:30 PM",
-      reason: "Dental cleaning",
-      status: "completed",
-    },
-  ])
+  const { user, logout } = useAuth()
+  const [appointments, setAppointments] = useState([])
+  const [doctorProfile, setDoctorProfile] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const stats = [
-    { label: "Today's Appointments", value: "5", icon: Calendar, trend: "+2 from yesterday" },
-    { label: "Total Patients", value: "156", icon: Users, trend: "+12 this month" },
-    { label: "This Month's Earnings", value: "$4,250", icon: DollarSign, trend: "+18% vs last month" },
-    { label: "Average Rating", value: "4.9", icon: Star, trend: "124 reviews" },
-  ]
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
 
-  const handleAccept = (id) => {
-    setAppointments(appointments.map(apt => 
-      apt.id === id ? { ...apt, status: "confirmed" } : apt
-    ))
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const [appointmentsRes, profileRes, statsRes] = await Promise.all([
+        api.getAppointments(),
+        api.getDoctorProfile(),
+        api.getDoctorStats()
+      ])
+      setAppointments(appointmentsRes.data || [])
+      setDoctorProfile(profileRes.data)
+      setStats(statsRes.data)
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleReject = (id) => {
-    setAppointments(appointments.map(apt => 
-      apt.id === id ? { ...apt, status: "cancelled" } : apt
-    ))
+  const handleAccept = async (id) => {
+    try {
+      await api.confirmAppointment(id)
+      await fetchDashboardData()
+    } catch (error) {
+      console.error("Failed to confirm appointment:", error)
+    }
+  }
+
+  const handleReject = async (id) => {
+    try {
+      await api.cancelAppointment(id, "Declined by doctor")
+      await fetchDashboardData()
+    } catch (error) {
+      console.error("Failed to reject appointment:", error)
+    }
+  }
+
+  const handleLogout = async () => {
+    await logout()
   }
 
   const filterAppointments = (status) => {
@@ -102,6 +93,51 @@ export default function DoctorDashboardPage() {
       return appointments.filter(a => a.status === "completed")
     }
     return appointments
+  }
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const todayAppointments = appointments.filter(a => {
+    const today = new Date().toDateString()
+    const aptDate = new Date(a.appointmentDate).toDateString()
+    return today === aptDate && (a.status === "confirmed" || a.status === "pending")
+  })
+
+  const statsData = [
+    { 
+      label: "Today's Appointments", 
+      value: todayAppointments.length.toString(), 
+      icon: Calendar, 
+      trend: "Scheduled today" 
+    },
+    { 
+      label: "Total Consultations", 
+      value: stats?.totalConsultations?.toString() || "0", 
+      icon: Users, 
+      trend: "All time" 
+    },
+    { 
+      label: "Consultation Fee", 
+      value: `$${doctorProfile?.consultationFee || 0}`, 
+      icon: DollarSign, 
+      trend: "Per session" 
+    },
+    { 
+      label: "Average Rating", 
+      value: stats?.rating?.toFixed(1) || "0.0", 
+      icon: Star, 
+      trend: `${stats?.reviewCount || 0} reviews` 
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -127,7 +163,7 @@ export default function DoctorDashboardPage() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                     <User className="h-4 w-4 text-primary" />
                   </div>
-                  <span className="hidden md:block">Dr. Sarah Wilson</span>
+                  <span className="hidden md:block">{user?.name || "Doctor"}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -135,11 +171,9 @@ export default function DoctorDashboardPage() {
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/login">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </Link>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -150,13 +184,13 @@ export default function DoctorDashboardPage() {
       <main className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Welcome back, Dr. Wilson!</h1>
+          <h1 className="text-2xl font-bold text-foreground">Welcome back, {user?.name}!</h1>
           <p className="text-muted-foreground">Here's your practice overview for today</p>
         </div>
 
         {/* Stats Grid */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
+          {statsData.map((stat) => (
             <Card key={stat.label}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -197,7 +231,7 @@ export default function DoctorDashboardPage() {
                 ) : (
                   filterAppointments("pending").map((appointment) => (
                     <div
-                      key={appointment.id}
+                      key={appointment._id}
                       className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-start gap-4">
@@ -206,18 +240,18 @@ export default function DoctorDashboardPage() {
                         </div>
                         <div>
                           <p className="font-semibold text-foreground">
-                            {appointment.patient} ({appointment.type})
+                            {appointment.pet?.name} ({appointment.pet?.breed})
                           </p>
-                          <p className="text-sm text-muted-foreground">Owner: {appointment.owner}</p>
+                          <p className="text-sm text-muted-foreground">Owner: {appointment.owner?.name}</p>
                           <p className="text-sm text-muted-foreground">{appointment.reason}</p>
                           <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
-                              {appointment.date}
+                              {formatDate(appointment.appointmentDate)}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              {appointment.time}
+                              {appointment.appointmentTime}
                             </span>
                           </div>
                         </div>
@@ -225,7 +259,7 @@ export default function DoctorDashboardPage() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => handleAccept(appointment.id)}
+                          onClick={() => handleAccept(appointment._id)}
                           className="gap-1"
                         >
                           <CheckCircle className="h-4 w-4" />
@@ -234,7 +268,7 @@ export default function DoctorDashboardPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleReject(appointment.id)}
+                          onClick={() => handleReject(appointment._id)}
                           className="gap-1 text-destructive hover:text-destructive bg-transparent"
                         >
                           <XCircle className="h-4 w-4" />
@@ -249,7 +283,7 @@ export default function DoctorDashboardPage() {
               <TabsContent value="today" className="space-y-4">
                 {filterAppointments("today").map((appointment) => (
                   <div
-                    key={appointment.id}
+                    key={appointment._id}
                     className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex items-start gap-4">
@@ -258,14 +292,14 @@ export default function DoctorDashboardPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-foreground">
-                          {appointment.patient} ({appointment.type})
+                          {appointment.pet?.name} ({appointment.pet?.breed})
                         </p>
-                        <p className="text-sm text-muted-foreground">Owner: {appointment.owner}</p>
+                        <p className="text-sm text-muted-foreground">Owner: {appointment.owner?.name}</p>
                         <p className="text-sm text-muted-foreground">{appointment.reason}</p>
                         <div className="mt-2 flex gap-4 text-sm">
                           <span className="flex items-center gap-1 text-primary font-medium">
                             <Clock className="h-4 w-4" />
-                            {appointment.time}
+                            {appointment.appointmentTime}
                           </span>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             appointment.status === "confirmed" 
@@ -296,21 +330,19 @@ export default function DoctorDashboardPage() {
               <TabsContent value="completed" className="space-y-4">
                 {filterAppointments("completed").map((appointment) => (
                   <div
-                    key={appointment.id}
+                    key={appointment._id}
                     className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-start gap-4">
+                        <p className="font-semibold text-foreground">
+                          {appointment.pet?.name} ({appointment.pet?.breed})
+                        </p>
+                        <p className="text-sm text-muted-foreground">Owner: {appointment.owner?.name}</p>
+                                          <div className="flex items-start gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                         <CheckCircle className="h-6 w-6 text-primary" />
                       </div>
-                      <div>
-                        <p className="font-semibold text-foreground">
-                          {appointment.patient} ({appointment.type})
-                        </p>
-                        <p className="text-sm text-muted-foreground">Owner: {appointment.owner}</p>
-                        <p className="text-sm text-muted-foreground">{appointment.reason}</p>
-                        <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
-                          <span>{appointment.date} at {appointment.time}</span>
+                      <div>                        <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
+                          <span>{formatDate(appointment.appointmentDate)} at {appointment.appointmentTime}</span>
                         </div>
                       </div>
                     </div>
@@ -331,11 +363,15 @@ export default function DoctorDashboardPage() {
             <CardDescription>Manage your available time slots for appointments</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {doctorProfile?.availability && Object.entries(doctorProfile.availability).map(([day, slots]) => (
                 <div key={day} className="rounded-lg border border-border p-4">
-                  <p className="font-medium text-foreground">{day}</p>
-                  <p className="text-sm text-muted-foreground">9:00 AM - 5:00 PM</p>
+                  <p className="font-medium text-foreground capitalize">{day}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {slots.available 
+                      ? `${slots.start || '9:00 AM'} - ${slots.end || '5:00 PM'}`
+                      : 'Unavailable'}
+                  </p>
                   <Button variant="link" className="mt-2 h-auto p-0 text-primary">
                     Edit slots
                   </Button>
