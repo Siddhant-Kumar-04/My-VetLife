@@ -4,25 +4,25 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.98 0.005 250);
-  --foreground: oklch(0.18 0.02 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 250);
-  --primary: oklch(0.55 0.20 250);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.95 0.02 250);
-  --secondary-foreground: oklch(0.25 0.02 250);
-  --muted: oklch(0.94 0.01 250);
-  --muted-foreground: oklch(0.45 0.02 250);
-  --accent: oklch(0.70 0.18 30);
-  --accent-foreground: oklch(0.18 0.02 30);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.90 0.02 250);
-  --input: oklch(0.92 0.01 250);
-  --ring: oklch(0.55 0.20 250);
+  --background: #fee4b3;
+  --foreground: #2c1810;
+  --card: #ffffff;
+  --card-foreground: #2c1810;
+  --popover: #ffffff;
+  --popover-foreground: #2c1810;
+  --primary: #6b4423;
+  --primary-foreground: #ffffff;
+  --secondary: #f5d7a8;
+  --secondary-foreground: #2c1810;
+  --muted: #f0d4a0;
+  --muted-foreground: #6b5947;
+  --accent: #fee4b3;
+  --accent-foreground: #2c1810;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e8c892;
+  --input: #fef7e9;
+  --ring: #6b4423;
   --chart-1: oklch(0.55 0.20 250);
   --chart-2: oklch(0.70 0.18 30);
   --chart-3: oklch(0.60 0.15 180);
@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-poppins), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -122,4 +122,71 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(10px, -15px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes rotate-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbit {
+  from {
+    transform: rotate(0deg) translateX(180px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(180px) rotate(-360deg);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+.animate-rotate-slow {
+  animation: rotate-slow 20s linear infinite;
+}
+
+.animate-orbit {
+  animation: orbit 15s linear infinite;
 }

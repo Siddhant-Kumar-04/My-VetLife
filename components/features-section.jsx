@@ -1,61 +1,59 @@
-import { Home, Calendar, FileText, Star, Shield, Clock } from "lucide-react"
+import Link from "next/link"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
 
 export function FeaturesSection() {
   const features = [
     {
-      icon: Home,
-      title: "Home Consultations",
-      description: "Get professional veterinary care without leaving your home. Reduce stress for your pets.",
+      image: "/dog.png",
+      title: "Dog Care",
+      description: "Complete health care for your canine companions with expert veterinarians.",
+      color: "from-orange-100 to-orange-50",
+      iconBg: "bg-orange-100",
     },
     {
-      icon: Calendar,
-      title: "Easy Scheduling",
-      description: "Book appointments at your convenience. Choose from available time slots that work for you.",
+      image: "/cat.png",
+      title: "Cat Care",
+      description: "Specialized feline health services from qualified veterinary professionals.",
+      color: "from-pink-100 to-pink-50",
+      iconBg: "bg-pink-100",
     },
+    
     {
-      icon: FileText,
-      title: "Pet Health Records",
-      description: "Maintain complete digital health records for all your pets in one secure place.",
-    },
-    {
-      icon: Star,
-      title: "Verified Reviews",
-      description: "Read genuine reviews from pet owners to choose the best veterinarian for your pet.",
-    },
-    {
-      icon: Shield,
-      title: "Qualified Doctors",
-      description: "All veterinarians are verified with proper qualifications and experience.",
-    },
-    {
-      icon: Clock,
-      title: "Emergency Support",
-      description: "Access urgent care services when your pet needs immediate attention.",
+      image: "/veterinary.png",
+      title: "Veterinary",
+      description: "Expert medical care for all your pet health needs and emergencies.",
+      color: "from-green-100 to-green-50",
+      iconBg: "bg-green-100",
     },
   ]
 
   return (
-    <section className="py-20 lg:py-28">
+    <section className="py-16 lg:py-24 bg-white">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold text-foreground lg:text-4xl text-balance">
-            Everything Your Pet Needs
+        <div className="mx-auto max-w-2xl text-center mb-16">
+          <p className="text-sm font-medium text-primary mb-2 uppercase tracking-wider">Our Services</p>
+          <h2 className="text-3xl font-bold text-foreground lg:text-4xl">
+            All Pet Care Services
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Comprehensive pet healthcare services designed for convenience and quality care
-          </p>
         </div>
 
-        <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="group rounded-2xl border border-border bg-card p-6 transition-all hover:border-primary/50 hover:shadow-lg"
+              className={`group rounded-3xl bg-gradient-to-br ${feature.color} p-8 text-center transition-all hover:shadow-xl hover:-translate-y-1`}
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/20">
-                <feature.icon className="h-6 w-6 text-primary" />
+              <div className={`mb-6 mx-auto flex h-20 w-20 items-center justify-center rounded-2xl ${feature.iconBg} transition-transform group-hover:scale-110`}>
+                <Image 
+                  src={feature.image} 
+                  alt={feature.title}
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
               </div>
-              <h3 className="mb-2 text-lg font-semibold text-foreground">
+              <h3 className="mb-3 text-xl font-bold text-foreground">
                 {feature.title}
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -63,6 +61,12 @@ export function FeaturesSection() {
               </p>
             </div>
           ))}
+        </div>
+        
+        <div className="text-center mt-12">
+          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-8">
+            <Link href="/doctors">See All Services</Link>
+          </Button>
         </div>
       </div>
     </section>

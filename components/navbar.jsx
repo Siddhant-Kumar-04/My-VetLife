@@ -15,9 +15,8 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
+    <header className="sticky top-0 z-50 w-full bg-accent/40 backdrop-blur">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8">      <Link href="/" className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
             <Stethoscope className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -29,8 +28,8 @@ export function Navbar() {
           <Link href="/" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
             Home
           </Link>
-          <Link href="/doctors" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            Find Doctors
+          <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            About Us
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
@@ -48,18 +47,21 @@ export function Navbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            About
+          <Link href="/doctors" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            Shop
+          </Link>
+          <Link href="/doctors" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            Blog
           </Link>
         </div>
 
         {/* Desktop Auth Buttons */}
         <div className="hidden items-center gap-3 lg:flex">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" asChild className="hover:bg-primary/5">
             <Link href="/login">Login</Link>
           </Button>
-          <Button asChild>
-            <Link href="/register">Get Started</Link>
+          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg">
+            <Link href="/register">Let's Talk</Link>
           </Button>
         </div>
 
@@ -76,6 +78,9 @@ export function Navbar() {
           )}
         </button>
       </nav>
+      
+      {/* Horizontal line below navbar */}
+      <div className="border-t border-primary/20" />
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
