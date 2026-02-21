@@ -21,13 +21,18 @@ dotenv.config();
 // Connect to database
 connectDB();
 
+// Parse CLIENT_URL — supports comma-separated list e.g. "http://localhost:3000,http://192.168.1.8:3000"
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map((u) => u.trim())
+  : ["http://localhost:3000"];
+
 const app = express();
 const httpServer = createServer(app);
 
 // ── Socket.io setup ──────────────────────────────────────────────────────────
 export const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -95,7 +100,7 @@ io.on("connection", (socket) => {
 // ── HTTP middleware ──────────────────────────────────────────────────────────
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     credentials: true,
   }),
 );

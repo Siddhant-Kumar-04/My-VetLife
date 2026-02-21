@@ -76,7 +76,7 @@ export default function AboutPage() {
 
       <main>
         {/* Hero Section */}
-        <section className="bg-gradient-to-b from-primary/5 to-background py-20 lg:py-28">
+        <section className="bg-linear-to-b from-primary/5 to-background py-20 lg:py-28">
           <div className="mx-auto max-w-7xl px-4 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-4xl font-bold text-foreground lg:text-5xl text-balance">
@@ -143,7 +143,7 @@ export default function AboutPage() {
                 </div>
               </div>
               <div className="relative">
-                <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-8">
+                <div className="aspect-square rounded-2xl bg-linear-to-br from-primary/20 to-accent/20 p-8">
                   <div className="flex h-full flex-col items-center justify-center rounded-xl bg-card shadow-lg p-8">
                     <Heart className="h-20 w-20 text-primary mb-4" />
                     <p className="text-center text-lg font-semibold text-foreground">

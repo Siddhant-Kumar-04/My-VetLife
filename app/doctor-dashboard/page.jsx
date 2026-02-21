@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { io } from "socket.io-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -37,6 +36,25 @@ import { useAuth } from "@/lib/AuthContext"
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000"
 
+// Must match backend STATUS_TRANSITIONS
+const STATUS_TRANSITIONS = {
+  pending:      ["accepted", "cancelled"],
+  accepted:     ["on-the-way", "cancelled"],
+  "on-the-way": ["arrived", "cancelled"],
+  arrived:      ["in-progress", "cancelled"],
+  "in-progress": ["completed", "cancelled"],
+  completed:    [],
+  cancelled:    [],
+}
+
+const ALL_STATUS_OPTIONS = [
+  { value: "on-the-way",  label: "On The Way",    Icon: "Navigation" },
+  { value: "arrived",     label: "Mark Arrived",   Icon: "MapPin" },
+  { value: "in-progress", label: "In Progress",    Icon: "Clock" },
+  { value: "completed",   label: "Mark Complete",  Icon: "CheckCircle" },
+  { value: "cancelled",   label: "Cancel",         Icon: "XCircle" },
+]
+
 export default function DoctorDashboardPage() {
   const { user, logout } = useAuth()
   const [appointments, setAppointments] = useState([])
@@ -51,14 +69,17 @@ export default function DoctorDashboardPage() {
   // ── Socket: connect + register doctor ─────────────────────────────────────
   useEffect(() => {
     if (!user?._id) return
-    const socket = io(SOCKET_URL, { transports: ["websocket", "polling"], reconnectionAttempts: 5 })
-    socketRef.current = socket
-    socket.on("connect", () => {
-      socket.emit("doctor-register", user._id)
+    let socket
+    import("socket.io-client").then(({ io }) => {
+      socket = io(SOCKET_URL, { transports: ["websocket", "polling"], reconnectionAttempts: 5 })
+      socketRef.current = socket
+      socket.on("connect", () => {
+        socket.emit("doctor-register", user._id)
+      })
     })
     return () => {
       stopSharingGPS()
-      socket.disconnect()
+      socket?.disconnect()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id])
@@ -150,10 +171,13 @@ export default function DoctorDashboardPage() {
       return appointments.filter(a => a.status === "pending")
     }
     if (status === "today") {
-      return appointments.filter(a => a.status === "confirmed" || a.status === "pending")
+      // Show all active appointments (not just today's date — for easy testing + real use)
+      return appointments.filter(a =>
+        ["confirmed", "accepted", "on-the-way", "arrived", "in-progress"].includes(a.status)
+      )
     }
     if (status === "completed") {
-      return appointments.filter(a => a.status === "completed")
+      return appointments.filter(a => a.status === "completed" || a.status === "cancelled")
     }
     return appointments
   }
@@ -284,7 +308,9 @@ export default function DoctorDashboardPage() {
                 <TabsTrigger value="pending">
                   Pending ({filterAppointments("pending").length})
                 </TabsTrigger>
-                <TabsTrigger value="today">Today's Schedule</TabsTrigger>
+                <TabsTrigger value="today">
+                  Active ({filterAppointments("today").length})
+                </TabsTrigger>
                 <TabsTrigger value="completed">Completed</TabsTrigger>
               </TabsList>
 
@@ -345,7 +371,7 @@ export default function DoctorDashboardPage() {
 
               <TabsContent value="today" className="space-y-4">
                 {filterAppointments("today").length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No appointments for today</p>
+                  <p className="text-center text-muted-foreground py-8">No active appointments</p>
                 ) : (
                   filterAppointments("today").map((appointment) => (
                     <div
@@ -410,24 +436,26 @@ export default function DoctorDashboardPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "on-the-way")}>
-                              <Navigation className="mr-2 h-4 w-4" /> On The Way
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "arrived")}>
-                              <MapPin className="mr-2 h-4 w-4" /> Mark Arrived
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "in-progress")}>
-                              <Clock className="mr-2 h-4 w-4" /> In Progress
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "completed")}>
-                              <CheckCircle className="mr-2 h-4 w-4" /> Mark Complete
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleUpdateStatus(appointment._id, "cancelled")}
-                            >
-                              <XCircle className="mr-2 h-4 w-4" /> Cancel
-                            </DropdownMenuItem>
+                            {(STATUS_TRANSITIONS[appointment.status] ?? []).length === 0 ? (
+                              <DropdownMenuItem disabled>No actions available</DropdownMenuItem>
+                            ) : (
+                              ALL_STATUS_OPTIONS
+                                .filter(opt => (STATUS_TRANSITIONS[appointment.status] ?? []).includes(opt.value))
+                                .map(opt => (
+                                  <DropdownMenuItem
+                                    key={opt.value}
+                                    className={opt.value === "cancelled" ? "text-destructive" : ""}
+                                    onClick={() => handleUpdateStatus(appointment._id, opt.value)}
+                                  >
+                                    {opt.value === "on-the-way"  && <Navigation className="mr-2 h-4 w-4" />}
+                                    {opt.value === "arrived"     && <MapPin className="mr-2 h-4 w-4" />}
+                                    {opt.value === "in-progress" && <Clock className="mr-2 h-4 w-4" />}
+                                    {opt.value === "completed"   && <CheckCircle className="mr-2 h-4 w-4" />}
+                                    {opt.value === "cancelled"   && <XCircle className="mr-2 h-4 w-4" />}
+                                    {opt.label}
+                                  </DropdownMenuItem>
+                                ))
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

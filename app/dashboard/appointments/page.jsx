@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { io } from "socket.io-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -74,49 +73,59 @@ export default function AppointmentsPage() {
 
   // ── Socket lifecycle ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const socket = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 5,
-    })
-    socketRef.current = socket
+    let socket
+    import("socket.io-client").then(({ io }) => {
+      socket = io(SOCKET_URL, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+      })
+      socketRef.current = socket
 
-    socket.on("connect",    () => setSocketConnected(true))
-    socket.on("disconnect", () => setSocketConnected(false))
+      socket.on("connect",    () => setSocketConnected(true))
+      socket.on("disconnect", () => setSocketConnected(false))
 
-    socket.on("tracking-data", (data) => {
-      setLiveLocation({
-        lat: data.latitude,
-        lng: data.longitude,
-        updatedAt: data.updatedAt,
+      socket.on("tracking-data", (data) => {
+        setLiveLocation({
+          lat: data.latitude,
+          lng: data.longitude,
+          updatedAt: data.updatedAt,
+        })
+      })
+
+      socket.on("appointment-status", (data) => {
+        setLiveStatus(data.status)
+        setAppointments((prev) =>
+          prev.map((a) =>
+            a._id === data.appointmentId ? { ...a, status: data.status } : a
+          )
+        )
       })
     })
 
-    socket.on("appointment-status", (data) => {
-      setLiveStatus(data.status)
-      setAppointments((prev) =>
-        prev.map((a) =>
-          a._id === data.appointmentId ? { ...a, status: data.status } : a
-        )
-      )
-    })
-
-    return () => socket.disconnect()
+    return () => socket?.disconnect()
   }, [])
 
   // ── Appointments fetch ────────────────────────────────────────────────────────
   useEffect(() => {
     fetchAppointments()
+    // Auto-refresh every 10s so Track Doctor button appears when doctor changes status
+    const interval = setInterval(fetchAppointments, 10000)
+    return () => clearInterval(interval)
   }, [])
 
-  const fetchAppointments = async () => {
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchAppointments = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
+      else setRefreshing(true)
       const response = await api.getAppointments()
       setAppointments(response.data || [])
     } catch (error) {
       console.error("Failed to fetch appointments:", error)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -125,7 +134,7 @@ export default function AppointmentsPage() {
     if (!confirm("Are you sure you want to cancel this appointment?")) return
     try {
       await api.cancelAppointment(id, "Cancelled by user")
-      await fetchAppointments()
+      await fetchAppointments(true)
     } catch (error) {
       console.error("Failed to cancel appointment:", error)
     }
@@ -143,7 +152,7 @@ export default function AppointmentsPage() {
       setRatingSubmitting(true)
       await api.rateAppointment(ratingDialog.appointmentId, ratingValue, reviewText)
       setRatingDialog({ open: false, appointmentId: null })
-      await fetchAppointments()
+      await fetchAppointments(true)
     } catch (error) {
       console.error("Failed to rate appointment:", error)
     } finally {
@@ -172,7 +181,8 @@ export default function AppointmentsPage() {
     try {
       const res = await api.getLiveTracking(appointment._id)
       const coords = res.data?.tracking?.liveLocation?.coordinates
-      if (coords?.length === 2) {
+      // Only set if real coords (not 0,0 placeholder)
+      if (coords?.length === 2 && !(coords[0] === 0 && coords[1] === 0)) {
         setLiveLocation({ lat: coords[1], lng: coords[0], updatedAt: null })
       }
       setLiveStatus(res.data?.status || null)
@@ -187,7 +197,7 @@ export default function AppointmentsPage() {
       try {
         const r = await api.getLiveTracking(appointment._id)
         const c = r.data?.tracking?.liveLocation?.coordinates
-        if (c?.length === 2) {
+        if (c?.length === 2 && !(c[0] === 0 && c[1] === 0)) {
           setLiveLocation((prev) =>
             prev?.updatedAt ? prev : { lat: c[1], lng: c[0], updatedAt: null }
           )
@@ -348,9 +358,21 @@ export default function AppointmentsPage() {
           <h1 className="text-2xl font-bold text-foreground">Appointments</h1>
           <p className="text-muted-foreground">View and manage your appointments</p>
         </div>
-        <Button asChild>
-          <Link href="/doctors">Book New Appointment</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 bg-transparent"
+            onClick={() => fetchAppointments(true)}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/doctors">Book New Appointment</Link>
+          </Button>
+        </div>
       </div>
 
       {loading && (
@@ -498,7 +520,7 @@ export default function AppointmentsPage() {
             </DialogTitle>
             <DialogDescription>
               {trackingDialog.doctorName
-                ? `Tracking Dr. ${trackingDialog.doctorName}`
+                ? `Tracking ${trackingDialog.doctorName.startsWith("Dr.") ? "" : "Dr. "}${trackingDialog.doctorName}`
                 : "Real-time location of your vet"}
             </DialogDescription>
           </DialogHeader>
@@ -508,7 +530,7 @@ export default function AppointmentsPage() {
               <div className="flex h-65 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : liveLocation ? (
+            ) : liveLocation && !(liveLocation.lat === 0 && liveLocation.lng === 0) ? (
               <>
                 {/* Leaflet map */}
                 <div className="overflow-hidden rounded-xl border border-border">

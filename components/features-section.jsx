@@ -42,7 +42,7 @@ export function FeaturesSection() {
           {features.map((feature) => (
             <div
               key={feature.title}
-              className={`group rounded-3xl bg-gradient-to-br ${feature.color} p-8 text-center transition-all hover:shadow-xl hover:-translate-y-1`}
+              className={`group rounded-3xl bg-linear-to-br ${feature.color} p-8 text-center transition-all hover:shadow-xl hover:-translate-y-1`}
             >
               <div className={`mb-6 mx-auto flex h-20 w-20 items-center justify-center rounded-2xl ${feature.iconBg} transition-transform group-hover:scale-110`}>
                 <Image 
