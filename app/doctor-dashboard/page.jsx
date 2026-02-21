@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import { io } from "socket.io-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -27,9 +28,14 @@ import {
   User,
   MoreVertical,
   Loader2,
+  Navigation,
+  MapPin,
+  Navigation2Off,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/AuthContext"
+
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000"
 
 export default function DoctorDashboardPage() {
   const { user, logout } = useAuth()
@@ -37,6 +43,63 @@ export default function DoctorDashboardPage() {
   const [doctorProfile, setDoctorProfile] = useState(null)
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [sharingId, setSharingId] = useState(null)   // appointmentId currently being GPS-shared
+
+  const socketRef  = useRef(null)
+  const watchIdRef = useRef(null)   // navigator.geolocation watchPosition ID
+
+  // ── Socket: connect + register doctor ─────────────────────────────────────
+  useEffect(() => {
+    if (!user?._id) return
+    const socket = io(SOCKET_URL, { transports: ["websocket", "polling"], reconnectionAttempts: 5 })
+    socketRef.current = socket
+    socket.on("connect", () => {
+      socket.emit("doctor-register", user._id)
+    })
+    return () => {
+      stopSharingGPS()
+      socket.disconnect()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id])
+
+  // ── GPS sharing helpers ────────────────────────────────────────────────────
+  const startSharingGPS = (appointmentId) => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.")
+      return
+    }
+    setSharingId(appointmentId)
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        socketRef.current?.emit("location-update", {
+          appointmentId,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        })
+      },
+      (err) => console.error("GPS error:", err),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    )
+  }
+
+  const stopSharingGPS = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    setSharingId(null)
+  }
+
+  const handleUpdateStatus = async (appointmentId, status) => {
+    try {
+      await api.updateAppointmentStatus(appointmentId, status)
+      socketRef.current?.emit("status-update", { appointmentId, status })
+      await fetchDashboardData()
+    } catch (err) {
+      console.error("Failed to update status:", err)
+    }
+  }
 
   useEffect(() => {
     fetchDashboardData()
@@ -281,50 +344,96 @@ export default function DoctorDashboardPage() {
               </TabsContent>
 
               <TabsContent value="today" className="space-y-4">
-                {filterAppointments("today").map((appointment) => (
-                  <div
-                    key={appointment._id}
-                    className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                        <Clock className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground">
-                          {appointment.pet?.name} ({appointment.pet?.breed})
-                        </p>
-                        <p className="text-sm text-muted-foreground">Owner: {appointment.owner?.name}</p>
-                        <p className="text-sm text-muted-foreground">{appointment.reason}</p>
-                        <div className="mt-2 flex gap-4 text-sm">
-                          <span className="flex items-center gap-1 text-primary font-medium">
-                            <Clock className="h-4 w-4" />
-                            {appointment.appointmentTime}
-                          </span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            appointment.status === "confirmed" 
-                              ? "bg-primary/10 text-primary" 
-                              : "bg-accent text-accent-foreground"
-                          }`}>
-                            {appointment.status}
-                          </span>
+                {filterAppointments("today").length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No appointments for today</p>
+                ) : (
+                  filterAppointments("today").map((appointment) => (
+                    <div
+                      key={appointment._id}
+                      className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                          <Clock className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">
+                            {appointment.pet?.name} ({appointment.pet?.breed})
+                          </p>
+                          <p className="text-sm text-muted-foreground">Owner: {appointment.owner?.name}</p>
+                          <p className="text-sm text-muted-foreground">{appointment.reason}</p>
+                          <div className="mt-2 flex gap-4 text-sm">
+                            <span className="flex items-center gap-1 text-primary font-medium">
+                              <Clock className="h-4 w-4" />
+                              {appointment.appointmentTime}
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              appointment.status === "confirmed"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-accent text-accent-foreground"
+                            }`}>
+                              {appointment.status}
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2">
+                        {/* GPS share toggle */}
+                        {sharingId === appointment._id ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1.5"
+                            onClick={stopSharingGPS}
+                          >
+                            <Navigation2Off className="h-4 w-4" />
+                            Stop Sharing
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => startSharingGPS(appointment._id)}
+                          >
+                            <Navigation className="h-4 w-4" />
+                            Share Location
+                          </Button>
+                        )}
+
+                        {/* Status menu */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "on-the-way")}>
+                              <Navigation className="mr-2 h-4 w-4" /> On The Way
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "arrived")}>
+                              <MapPin className="mr-2 h-4 w-4" /> Mark Arrived
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "in-progress")}>
+                              <Clock className="mr-2 h-4 w-4" /> In Progress
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(appointment._id, "completed")}>
+                              <CheckCircle className="mr-2 h-4 w-4" /> Mark Complete
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleUpdateStatus(appointment._id, "cancelled")}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" /> Cancel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Add Notes</DropdownMenuItem>
-                        <DropdownMenuItem>Mark Complete</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Cancel</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
+                  ))
+                )}
               </TabsContent>
 
               <TabsContent value="completed" className="space-y-4">
