@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/AuthContext"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, user, isAuthenticated } = useAuth()
+  const { login, user, isAuthenticated, loading: authLoading } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -20,8 +20,9 @@ export default function LoginPage() {
     password: "",
   })
 
-  // Redirect if already logged in
+  // Redirect if already logged in (only after auth check completes)
   useEffect(() => {
+    if (authLoading) return
     if (isAuthenticated && user) {
       if (user.role === "owner") {
         router.push("/dashboard")
@@ -31,7 +32,7 @@ export default function LoginPage() {
         router.push("/admin")
       }
     }
-  }, [isAuthenticated, user, router])
+  }, [authLoading, isAuthenticated, user, router])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

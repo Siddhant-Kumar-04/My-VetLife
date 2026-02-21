@@ -22,7 +22,7 @@ export default function DashboardPage() {
     try {
       setLoading(true)
       const [appointmentsRes, petsRes] = await Promise.all([
-        api.getAppointments({ status: "confirmed,pending" }),
+        api.getAppointments(),
         api.getPets()
       ])
       setAppointments(appointmentsRes.data || [])
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   }
 
   const upcomingAppointments = appointments
-    .filter(apt => ["confirmed", "pending"].includes(apt.status))
+    .filter(apt => ["pending", "accepted", "confirmed", "on-the-way", "arrived", "in-progress"].includes(apt.status))
     .slice(0, 2)
 
   const stats = [
@@ -134,9 +134,11 @@ export default function DashboardPage() {
                           </div>
                           <span
                             className={`rounded-full px-2 py-1 text-xs font-medium ${
-                              appointment.status === "confirmed"
+                              appointment.status === "accepted"
                                 ? "bg-primary/10 text-primary"
-                                : "bg-accent text-accent-foreground"
+                                : appointment.status === "pending"
+                                ? "bg-accent text-accent-foreground"
+                                : "bg-blue-100 text-blue-700"
                             }`}
                           >
                             {appointment.status}

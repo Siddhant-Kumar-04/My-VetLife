@@ -14,12 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Star, MapPin, Clock, Filter, Stethoscope, Award, CheckCircle, Loader2 } from "lucide-react"
+import { Search, Star, MapPin, Clock, Filter, Stethoscope, Award, CheckCircle, Loader2, AlertCircle } from "lucide-react"
 import { api } from "@/lib/api"
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [specialty, setSpecialty] = useState("all")
   const [sortBy, setSortBy] = useState("rating")
@@ -31,14 +32,16 @@ export default function DoctorsPage() {
   const fetchDoctors = async () => {
     try {
       setLoading(true)
+      setError(null)
       const params = {}
       if (specialty !== "all") params.specialty = specialty
       if (sortBy) params.sortBy = sortBy
 
       const response = await api.getDoctors(params)
       setDoctors(response.data || [])
-    } catch (error) {
-      console.error("Failed to fetch doctors:", error)
+    } catch (err) {
+      console.error("Failed to fetch doctors:", err)
+      setError(err.message || "Failed to load doctors. Make sure the backend server is running.")
     } finally {
       setLoading(false)
     }
@@ -111,10 +114,23 @@ export default function DoctorsPage() {
           </Select>
         </div>
 
+        {/* API Error Banner */}
+        {error && !loading && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <p className="font-medium text-destructive">Failed to load doctors</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+          </div>
+        )}
+
         {/* Results Count */}
-        <p className="mb-6 text-sm text-muted-foreground">
-          Showing {filteredDoctors.length} veterinarians
-        </p>
+        {!error && (
+          <p className="mb-6 text-sm text-muted-foreground">
+            Showing {filteredDoctors.length} veterinarians
+          </p>
+        )}
 
         {/* Loading State */}
         {loading && (

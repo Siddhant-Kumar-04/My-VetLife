@@ -1,6 +1,6 @@
-import Doctor from '../models/Doctor.js';
-import User from '../models/User.js';
-import ErrorResponse from '../utils/ErrorResponse.js';
+import Doctor from "../models/Doctor.js";
+import User from "../models/User.js";
+import ErrorResponse from "../utils/ErrorResponse.js";
 
 // @desc    Get all doctors
 // @route   GET /api/doctors
@@ -9,49 +9,48 @@ export const getDoctors = async (req, res, next) => {
   try {
     const { specialty, minRating, sortBy, search } = req.query;
 
-    let query = { isVerified: true };
+    // Only show doctors approved by admin
+    let query = { verificationStatus: "approved", isVerified: true };
 
     // Filter by specialty
-    if (specialty && specialty !== 'all') {
+    if (specialty && specialty !== "all") {
       query.specialty = specialty;
     }
 
-    // Filter by rating
+    // Filter by minimum rating
     if (minRating) {
       query.rating = { $gte: parseFloat(minRating) };
     }
 
-    // Search by name
-    let doctors;
+    // Search by doctor name via the User collection
     if (search) {
       const users = await User.find({
-        role: 'doctor',
-        name: { $regex: search, $options: 'i' }
-      }).select('_id');
-      
-      query.user = { $in: users.map(u => u._id) };
+        role: "doctor",
+        name: { $regex: search, $options: "i" },
+      }).select("_id");
+      query.user = { $in: users.map((u) => u._id) };
     }
 
     // Sorting
     let sort = {};
-    if (sortBy === 'rating') {
+    if (sortBy === "rating") {
       sort = { rating: -1 };
-    } else if (sortBy === 'reviews') {
+    } else if (sortBy === "reviews") {
       sort = { reviewCount: -1 };
-    } else if (sortBy === 'experience') {
+    } else if (sortBy === "experience") {
       sort = { experience: -1 };
     } else {
       sort = { rating: -1 };
     }
 
-    doctors = await Doctor.find(query)
-      .populate('user', 'name email phone avatar')
+    const doctors = await Doctor.find(query)
+      .populate("user", "name email phone avatar")
       .sort(sort);
 
     res.status(200).json({
       success: true,
       count: doctors.length,
-      data: doctors
+      data: doctors,
     });
   } catch (error) {
     next(error);
@@ -63,16 +62,20 @@ export const getDoctors = async (req, res, next) => {
 // @access  Public
 export const getDoctor = async (req, res, next) => {
   try {
-    const doctor = await Doctor.findById(req.params.id)
-      .populate('user', 'name email phone avatar address');
+    const doctor = await Doctor.findById(req.params.id).populate(
+      "user",
+      "name email phone avatar address",
+    );
 
     if (!doctor) {
-      return next(new ErrorResponse(`Doctor not found with id of ${req.params.id}`, 404));
+      return next(
+        new ErrorResponse(`Doctor not found with id of ${req.params.id}`, 404),
+      );
     }
 
     res.status(200).json({
       success: true,
-      data: doctor
+      data: doctor,
     });
   } catch (error) {
     next(error);
@@ -84,16 +87,18 @@ export const getDoctor = async (req, res, next) => {
 // @access  Private (Doctor)
 export const getDoctorProfile = async (req, res, next) => {
   try {
-    const doctor = await Doctor.findOne({ user: req.user.id })
-      .populate('user', 'name email phone avatar address');
+    const doctor = await Doctor.findOne({ user: req.user.id }).populate(
+      "user",
+      "name email phone avatar address",
+    );
 
     if (!doctor) {
-      return next(new ErrorResponse('Doctor profile not found', 404));
+      return next(new ErrorResponse("Doctor profile not found", 404));
     }
 
     res.status(200).json({
       success: true,
-      data: doctor
+      data: doctor,
     });
   } catch (error) {
     next(error);
@@ -110,17 +115,17 @@ export const updateDoctorProfile = async (req, res, next) => {
       req.body,
       {
         new: true,
-        runValidators: true
-      }
-    ).populate('user', 'name email phone avatar');
+        runValidators: true,
+      },
+    ).populate("user", "name email phone avatar");
 
     if (!doctor) {
-      return next(new ErrorResponse('Doctor profile not found', 404));
+      return next(new ErrorResponse("Doctor profile not found", 404));
     }
 
     res.status(200).json({
       success: true,
-      data: doctor
+      data: doctor,
     });
   } catch (error) {
     next(error);
@@ -137,17 +142,17 @@ export const updateAvailability = async (req, res, next) => {
       { availability: req.body.availability },
       {
         new: true,
-        runValidators: true
-      }
+        runValidators: true,
+      },
     );
 
     if (!doctor) {
-      return next(new ErrorResponse('Doctor profile not found', 404));
+      return next(new ErrorResponse("Doctor profile not found", 404));
     }
 
     res.status(200).json({
       success: true,
-      data: doctor
+      data: doctor,
     });
   } catch (error) {
     next(error);
@@ -162,7 +167,7 @@ export const getDoctorStats = async (req, res, next) => {
     const doctor = await Doctor.findOne({ user: req.user.id });
 
     if (!doctor) {
-      return next(new ErrorResponse('Doctor profile not found', 404));
+      return next(new ErrorResponse("Doctor profile not found", 404));
     }
 
     // You can add more detailed stats calculation here
@@ -170,12 +175,48 @@ export const getDoctorStats = async (req, res, next) => {
       totalConsultations: doctor.totalConsultations,
       rating: doctor.rating,
       reviewCount: doctor.reviewCount,
-      isVerified: doctor.isVerified
+      isVerified: doctor.isVerified,
     };
 
     res.status(200).json({
       success: true,
-      data: stats
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Set doctor online / offline
+// @route   PUT /api/doctors/online-status
+// @access  Private (Doctor)
+export const setOnlineStatus = async (req, res, next) => {
+  try {
+    const doctor = await Doctor.findOne({ user: req.user.id });
+    if (!doctor) {
+      return next(new ErrorResponse("Doctor profile not found", 404));
+    }
+
+    const { isOnline } = req.body;
+    if (typeof isOnline !== "boolean") {
+      return next(
+        new ErrorResponse(
+          "Please provide isOnline as a boolean (true / false)",
+          400,
+        ),
+      );
+    }
+
+    doctor.isActive = isOnline;
+    doctor.lastSeen = new Date();
+    await doctor.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isOnline: doctor.isActive,
+        lastSeen: doctor.lastSeen,
+      },
     });
   } catch (error) {
     next(error);

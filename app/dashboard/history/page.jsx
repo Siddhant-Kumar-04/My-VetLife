@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,97 +12,88 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Calendar,
   Clock,
   Search,
   Star,
   FileText,
-  Download,
   Filter,
+  Loader2,
+  Pill,
+  Stethoscope,
 } from "lucide-react"
+import { api } from "@/lib/api"
 
 export default function HistoryPage() {
+  const [history, setHistory] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterPet, setFilterPet] = useState("all")
+  const [selectedRecord, setSelectedRecord] = useState(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
-  const history = [
-    {
-      id: 1,
-      doctor: "Dr. Sarah Wilson",
-      specialty: "General Veterinarian",
-      pet: "Max",
-      petType: "Golden Retriever",
-      date: "Jan 15, 2026",
-      time: "10:00 AM",
-      diagnosis: "Annual wellness checkup - All vitals normal",
-      prescription: "Heartworm prevention medication",
-      rating: 5,
-      fee: "$75",
-    },
-    {
-      id: 2,
-      doctor: "Dr. Michael Chen",
-      specialty: "Feline Specialist",
-      pet: "Luna",
-      petType: "Persian Cat",
-      date: "Jan 10, 2026",
-      time: "2:30 PM",
-      diagnosis: "Mild respiratory infection",
-      prescription: "Antibiotics for 7 days",
-      rating: 5,
-      fee: "$90",
-    },
-    {
-      id: 3,
-      doctor: "Dr. Emily Rodriguez",
-      specialty: "General Veterinarian",
-      pet: "Buddy",
-      petType: "Labrador",
-      date: "Dec 20, 2025",
-      time: "11:00 AM",
-      diagnosis: "Skin allergy - Seasonal",
-      prescription: "Antihistamines and medicated shampoo",
-      rating: 4,
-      fee: "$80",
-    },
-    {
-      id: 4,
-      doctor: "Dr. James Brown",
-      specialty: "Emergency Care",
-      pet: "Max",
-      petType: "Golden Retriever",
-      date: "Nov 15, 2025",
-      time: "6:00 PM",
-      diagnosis: "Minor paw injury",
-      prescription: "Wound care and pain medication",
-      rating: 5,
-      fee: "$120",
-    },
-    {
-      id: 5,
-      doctor: "Dr. Lisa Park",
-      specialty: "Dermatology",
-      pet: "Luna",
-      petType: "Persian Cat",
-      date: "Oct 28, 2025",
-      time: "3:00 PM",
-      diagnosis: "Routine vaccination",
-      prescription: "No medication needed",
-      rating: 5,
-      fee: "$60",
-    },
-  ]
+  useEffect(() => {
+    fetchHistory()
+  }, [])
 
-  const pets = ["Max", "Luna", "Buddy"]
+  const fetchHistory = async () => {
+    try {
+      setLoading(true)
+      const response = await api.getAppointments({ status: "completed" })
+      setHistory(response.data || [])
+    } catch (error) {
+      console.error("Failed to fetch history:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Derive unique pet names from real data
+  const pets = [...new Set(history.map((h) => h.pet?.name).filter(Boolean))]
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "—"
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  const formatMedications = (prescription) => {
+    if (!prescription?.medications?.length) return null
+    return prescription.medications
+      .map(
+        (m) =>
+          `${m.name}${m.dosage ? ` (${m.dosage})` : ""}${m.duration ? ` for ${m.duration}` : ""}`
+      )
+      .join(", ")
+  }
 
   const filteredHistory = history.filter((item) => {
+    const doctorName = item.doctor?.user?.name || ""
+    const diagnosis = item.notes?.diagnosis || item.notes?.doctorNotes || ""
+    const petName = item.pet?.name || ""
     const matchesSearch =
-      item.doctor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.diagnosis.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.pet.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesPet = filterPet === "all" || item.pet === filterPet
+      doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      diagnosis.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      petName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesPet = filterPet === "all" || petName === filterPet
     return matchesSearch && matchesPet
   })
+
+  const totalSpent = history.reduce((sum, r) => sum + (r.payment?.amount || 0), 0)
+  const ratedHistory = history.filter((r) => r.rating?.value)
+  const avgRating =
+    ratedHistory.length
+      ? (ratedHistory.reduce((sum, r) => sum + r.rating.value, 0) / ratedHistory.length).toFixed(1)
+      : "—"
 
   return (
     <div className="space-y-6">
@@ -138,121 +129,278 @@ export default function HistoryPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" className="gap-2 bg-transparent">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
         </CardContent>
       </Card>
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
 
       {/* History List */}
-      <div className="space-y-4">
-        {filteredHistory.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No records found</CardTitle>
-              <CardDescription>
-                Try adjusting your search or filter criteria
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : (
-          filteredHistory.map((record) => (
-            <Card key={record.id}>
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  {/* Main Info */}
-                  <div className="flex-1 space-y-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="font-semibold text-foreground">{record.doctor}</h3>
-                        <p className="text-sm text-muted-foreground">{record.specialty}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < record.rating
-                                ? "fill-accent text-accent"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        {record.date}
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        {record.time}
-                      </div>
-                      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                        {record.pet} ({record.petType})
-                      </span>
-                    </div>
-
-                    <div className="rounded-lg bg-muted/50 p-4">
-                      <p className="text-sm font-medium text-foreground">Diagnosis</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{record.diagnosis}</p>
-                      {record.prescription && (
-                        <>
-                          <p className="mt-3 text-sm font-medium text-foreground">Prescription</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{record.prescription}</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col gap-2 lg:items-end">
-                    <p className="text-lg font-bold text-foreground">{record.fee}</p>
-                    <Button variant="outline" size="sm" className="gap-1 bg-transparent">
-                      <FileText className="h-4 w-4" />
-                      View Full Report
-                    </Button>
-                    <Button variant="ghost" size="sm" className="gap-1">
-                      <Download className="h-4 w-4" />
-                      Download PDF
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
+      {!loading && (
+        <div className="space-y-4">
+          {filteredHistory.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No records found</CardTitle>
+                <CardDescription>
+                  {history.length === 0
+                    ? "You have no completed consultations yet."
+                    : "Try adjusting your search or filter criteria."}
+                </CardDescription>
+              </CardHeader>
             </Card>
-          ))
-        )}
-      </div>
+          ) : (
+            filteredHistory.map((record) => (
+              <Card key={record._id}>
+                <CardContent className="p-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    {/* Main Info */}
+                    <div className="flex-1 space-y-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            {record.doctor?.user?.name || "Doctor"}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {record.doctor?.specialty || "Veterinarian"}
+                          </p>
+                        </div>
+                        {record.rating?.value ? (
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-4 w-4 ${
+                                  i < record.rating.value
+                                    ? "fill-accent text-accent"
+                                    : "text-muted-foreground"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Not rated</span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {formatDate(record.appointmentDate)}
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          {record.appointmentTime || "—"}
+                        </div>
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                          {record.pet?.name} ({record.pet?.breed})
+                        </span>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                        {record.notes?.diagnosis && (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                              <Stethoscope className="h-4 w-4 text-primary" />
+                              Diagnosis
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {record.notes.diagnosis}
+                            </p>
+                          </div>
+                        )}
+                        {record.notes?.doctorNotes && (
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Doctor Notes</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {record.notes.doctorNotes}
+                            </p>
+                          </div>
+                        )}
+                        {formatMedications(record.prescription) && (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                              <Pill className="h-4 w-4 text-primary" />
+                              Prescription
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {formatMedications(record.prescription)}
+                            </p>
+                          </div>
+                        )}
+                        {!record.notes?.diagnosis &&
+                          !record.notes?.doctorNotes &&
+                          !formatMedications(record.prescription) && (
+                            <p className="text-sm text-muted-foreground italic">
+                              No notes recorded
+                            </p>
+                          )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-2 lg:items-end">
+                      {record.payment?.amount ? (
+                        <p className="text-lg font-bold text-foreground">
+                          ${record.payment.amount}
+                        </p>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 bg-transparent"
+                        onClick={() => {
+                          setSelectedRecord(record)
+                          setDetailOpen(true)
+                        }}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Full Report
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-primary/5 p-4 text-center">
-              <p className="text-2xl font-bold text-primary">{history.length}</p>
-              <p className="text-sm text-muted-foreground">Total Consultations</p>
+      {!loading && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg bg-primary/5 p-4 text-center">
+                <p className="text-2xl font-bold text-primary">{history.length}</p>
+                <p className="text-sm text-muted-foreground">Total Consultations</p>
+              </div>
+              <div className="rounded-lg bg-accent/20 p-4 text-center">
+                <p className="text-2xl font-bold text-foreground">${totalSpent.toFixed(0)}</p>
+                <p className="text-sm text-muted-foreground">Total Spent</p>
+              </div>
+              <div className="rounded-lg bg-muted p-4 text-center">
+                <p className="text-2xl font-bold text-foreground">{avgRating}</p>
+                <p className="text-sm text-muted-foreground">Avg. Rating Given</p>
+              </div>
             </div>
-            <div className="rounded-lg bg-accent/20 p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">
-                ${history.reduce((sum, r) => sum + parseInt(r.fee.replace("$", "")), 0)}
-              </p>
-              <p className="text-sm text-muted-foreground">Total Spent</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Full Report Dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Consultation Report</DialogTitle>
+          </DialogHeader>
+          {selectedRecord && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground">Doctor</p>
+                  <p className="font-medium">{selectedRecord.doctor?.user?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Specialty</p>
+                  <p className="font-medium">{selectedRecord.doctor?.specialty || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Pet</p>
+                  <p className="font-medium">
+                    {selectedRecord.pet?.name} ({selectedRecord.pet?.breed})
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Date</p>
+                  <p className="font-medium">
+                    {formatDate(selectedRecord.appointmentDate)} at {selectedRecord.appointmentTime}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Type</p>
+                  <p className="font-medium capitalize">
+                    {selectedRecord.appointmentType || "consultation"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Fee Paid</p>
+                  <p className="font-medium">
+                    {selectedRecord.payment?.amount ? `$${selectedRecord.payment.amount}` : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {selectedRecord.notes?.diagnosis && (
+                <div className="rounded-md bg-muted/50 p-3">
+                  <p className="font-medium text-foreground mb-1">Diagnosis</p>
+                  <p className="text-muted-foreground">{selectedRecord.notes.diagnosis}</p>
+                </div>
+              )}
+
+              {selectedRecord.notes?.doctorNotes && (
+                <div className="rounded-md bg-muted/50 p-3">
+                  <p className="font-medium text-foreground mb-1">Doctor Notes</p>
+                  <p className="text-muted-foreground">{selectedRecord.notes.doctorNotes}</p>
+                </div>
+              )}
+
+              {selectedRecord.prescription?.medications?.length > 0 && (
+                <div className="rounded-md bg-muted/50 p-3">
+                  <p className="font-medium text-foreground mb-2">Prescriptions</p>
+                  <ul className="space-y-1">
+                    {selectedRecord.prescription.medications.map((med, i) => (
+                      <li key={i} className="text-muted-foreground">
+                        • <strong>{med.name}</strong>
+                        {med.dosage && ` — ${med.dosage}`}
+                        {med.frequency && ` — ${med.frequency}`}
+                        {med.duration && ` for ${med.duration}`}
+                      </li>
+                    ))}
+                  </ul>
+                  {selectedRecord.prescription.notes && (
+                    <p className="mt-2 text-muted-foreground italic">
+                      {selectedRecord.prescription.notes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selectedRecord.rating?.value && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-muted-foreground">Your Rating:</p>
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i < selectedRecord.rating.value
+                              ? "fill-accent text-accent"
+                              : "text-muted-foreground"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {selectedRecord.rating.review && (
+                    <p className="text-muted-foreground italic">
+                      "{selectedRecord.rating.review}"
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="rounded-lg bg-muted p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">
-                {(history.reduce((sum, r) => sum + r.rating, 0) / history.length).toFixed(1)}
-              </p>
-              <p className="text-sm text-muted-foreground">Avg. Rating Given</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

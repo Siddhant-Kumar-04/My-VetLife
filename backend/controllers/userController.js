@@ -1,5 +1,5 @@
-import User from '../models/User.js';
-import ErrorResponse from '../utils/ErrorResponse.js';
+import User from "../models/User.js";
+import ErrorResponse from "../utils/ErrorResponse.js";
 
 // @desc    Get user profile
 // @route   GET /api/users/profile
@@ -10,7 +10,7 @@ export const getUserProfile = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: user
+      data: user,
     });
   } catch (error) {
     next(error);
@@ -22,18 +22,29 @@ export const getUserProfile = async (req, res, next) => {
 // @access  Private
 export const updateUserProfile = async (req, res, next) => {
   try {
+    // Whitelist: only allow safe, non-privileged fields to be updated.
+    // role, password, isVerified, and email changes are intentionally excluded.
+    const ALLOWED_FIELDS = ["name", "phone", "avatar", "address"];
+    const updates = {};
+    for (const field of ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return next(new ErrorResponse("No valid fields provided to update", 400));
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
-      }
+      { $set: updates },
+      { new: true, runValidators: true },
     );
 
     res.status(200).json({
       success: true,
-      data: user
+      data: user,
     });
   } catch (error) {
     next(error);
@@ -49,7 +60,7 @@ export const deleteUserAccount = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: {}
+      data: {},
     });
   } catch (error) {
     next(error);

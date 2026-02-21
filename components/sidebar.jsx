@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -15,9 +15,17 @@ import {
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/AuthContext"
 
 export function DashboardSidebar({ open, onClose }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { logout } = useAuth()
+
+  const handleSignOut = async () => {
+    await logout()
+    router.push("/login")
+  }
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -93,12 +101,10 @@ export function DashboardSidebar({ open, onClose }) {
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground"
-            asChild
+            onClick={handleSignOut}
           >
-            <Link href="/login">
-              <LogOut className="h-5 w-5" />
-              Sign Out
-            </Link>
+            <LogOut className="h-5 w-5" />
+            Sign Out
           </Button>
         </div>
       </aside>
