@@ -1,0 +1,54 @@
+# Google Cloud Build — builds & pushes image to Artifact Registry
+# Trigger this via: gcloud builds submit --config cloudbuild.yaml .
+#
+# Required substitutions (set in Cloud Build trigger or pass via --substitutions):
+#   _REGION          e.g. asia-south1
+#   _REPO            e.g. vetlife          (Artifact Registry repo name)
+#   _SERVICE_NAME    e.g. vetlife-backend  (Cloud Run service name)
+
+steps:
+  # ── Build Docker image ──────────────────────────────────────────────────────
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - build
+      - -t
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA"
+      - -t
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest"
+      - .
+    dir: "."
+
+  # ── Push to Artifact Registry ───────────────────────────────────────────────
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - push
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend"
+
+  # ── Deploy to Cloud Run ─────────────────────────────────────────────────────
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - "${_SERVICE_NAME}"
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --set-env-vars=NODE_ENV=production
+      # Secrets are injected via Secret Manager — add more with comma separation:
+      # - --set-secrets=MONGODB_URI=vetlife-mongodb-uri:latest,JWT_SECRET=vetlife-jwt-secret:latest
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest"
+
+substitutions:
+  _REGION: asia-south1
+  _REPO: vetlife
+  _SERVICE_NAME: vetlife-backend
+
+options:
+  logging: CLOUD_LOGGING_ONLY
