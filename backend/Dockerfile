@@ -28,7 +28,7 @@ RUN rm -f .env .env.example seeder.js
 # Switch to non-root user
 USER vetlife
 
-# Cloud Run sets PORT env var automatically (default 8080)
+#Cloud Run sets PORT env var automatically (default 8080)
 # Our server.js already uses: process.env.PORT || 5000
 EXPOSE 8080
 
