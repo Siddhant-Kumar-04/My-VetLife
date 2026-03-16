@@ -16,7 +16,7 @@ const dancingScript = Dancing_Script({
 });
 
 export const metadata: Metadata = {
-  title: "Vetic - Quality Pet Care at Home",
+  title: "Vetic-At-Home Quality Pet Care at Home",
   description: "Connect with qualified veterinarians and get the best care for your pets",
 };
 

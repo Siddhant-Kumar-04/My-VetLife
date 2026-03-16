@@ -387,7 +387,7 @@ export default function DoctorProfilePage() {
                 {/* Fee */}
                 <div className="rounded-lg bg-primary/5 p-4 text-center">
                   <p className="text-sm text-muted-foreground">Consultation Fee</p>
-                  <p className="text-3xl font-bold text-primary">${doctor.consultationFee || 0}</p>
+                  <p className="text-3xl font-bold text-primary">₹{doctor.consultationFee || 0}</p>
                 </div>
 
                 {/* Login nudge */}
