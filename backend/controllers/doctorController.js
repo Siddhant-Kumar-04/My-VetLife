@@ -2,6 +2,53 @@ import Doctor from "../models/Doctor.js";
 import User from "../models/User.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 
+const defaultDaySchedule = {
+  monday: { start: "09:00", end: "17:00", available: true },
+  tuesday: { start: "09:00", end: "17:00", available: true },
+  wednesday: { start: "09:00", end: "17:00", available: true },
+  thursday: { start: "09:00", end: "17:00", available: true },
+  friday: { start: "09:00", end: "17:00", available: true },
+  saturday: { start: "10:00", end: "14:00", available: false },
+  sunday: { start: "10:00", end: "14:00", available: false },
+};
+
+const normalizeAvailability = (
+  currentAvailability = {},
+  incomingAvailability = {},
+) => {
+  const normalized = {};
+
+  for (const day of Object.keys(defaultDaySchedule)) {
+    const current = currentAvailability[day] || {};
+    const incoming = incomingAvailability[day] || {};
+    let available = defaultDaySchedule[day].available;
+
+    if (typeof current.available === "boolean") {
+      available = current.available;
+    }
+
+    if (typeof incoming.available === "boolean") {
+      available = incoming.available;
+    }
+
+    normalized[day] = {
+      start:
+        incoming.start ||
+        incoming.startTime ||
+        current.start ||
+        defaultDaySchedule[day].start,
+      end:
+        incoming.end ||
+        incoming.endTime ||
+        current.end ||
+        defaultDaySchedule[day].end,
+      available,
+    };
+  }
+
+  return normalized;
+};
+
 // @desc    Get all doctors
 // @route   GET /api/doctors
 // @access  Public
@@ -137,18 +184,18 @@ export const updateDoctorProfile = async (req, res, next) => {
 // @access  Private (Doctor)
 export const updateAvailability = async (req, res, next) => {
   try {
-    const doctor = await Doctor.findOneAndUpdate(
-      { user: req.user.id },
-      { availability: req.body.availability },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
+    const doctor = await Doctor.findOne({ user: req.user.id });
 
     if (!doctor) {
       return next(new ErrorResponse("Doctor profile not found", 404));
     }
+
+    doctor.availability = normalizeAvailability(
+      doctor.availability || {},
+      req.body.availability || {},
+    );
+
+    await doctor.save();
 
     res.status(200).json({
       success: true,
