@@ -5,7 +5,7 @@ export function TestimonialsSection() {
     {
       name: "Sarah Johnson",
       role: "Dog Owner",
-      content: "Vetic made it so easy to get my anxious pup the care he needed without the stress of a clinic visit. The vet was professional and caring.",
+      content: "Vetic-At-Home made it so easy to get my anxious pup the care he needed without the stress of a clinic visit. The vet was professional and caring.",
       rating: 5,
       pet: "Golden Retriever",
     },

@@ -282,7 +282,7 @@ export default function AboutPage() {
                   <h3 className="font-semibold text-foreground">Email</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
                     support@vetic.com<br />
-                    hello@vetic.com
+                    vetic-at-home@vetic.com
                   </p>
                 </CardContent>
               </Card>
@@ -297,7 +297,7 @@ export default function AboutPage() {
               Ready to Experience Better Pet Care?
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-primary-foreground/80">
-              Join thousands of pet owners who trust Vetic for convenient, quality veterinary care at home.
+              Join thousands of pet owners who trust Vetic-At-Home for convenient, quality veterinary care at home.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button size="lg" variant="secondary" asChild>

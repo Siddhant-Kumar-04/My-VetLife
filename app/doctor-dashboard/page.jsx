@@ -14,7 +14,7 @@ import {
 import {
   Calendar,
   Clock,
-  DollarSign,
+  IndianRupee,
   Users,
   CheckCircle,
   XCircle,
@@ -207,8 +207,8 @@ export default function DoctorDashboardPage() {
     },
     { 
       label: "Consultation Fee", 
-      value: `$${doctorProfile?.consultationFee || 0}`, 
-      icon: DollarSign, 
+      value: `₹${doctorProfile?.consultationFee || 0}`, 
+      icon: IndianRupee, 
       trend: "Per session" 
     },
     { 
@@ -236,7 +236,7 @@ export default function DoctorDashboardPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
               <Stethoscope className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">Vetic</span>
+            <span className="text-xl font-bold text-foreground">Vetic-At-Home</span>
             <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">Doctor</span>
           </Link>
           <div className="flex items-center gap-4">

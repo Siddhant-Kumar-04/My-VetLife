@@ -499,7 +499,7 @@ function BillingTab() {
                   </p>
                 </div>
                 <p className="font-medium text-foreground">
-                  {appt.payment?.amount ? `$${appt.payment.amount}` : "—"}
+                  {appt.payment?.amount ? `₹${appt.payment.amount}` : "—"}
                 </p>
               </div>
             ))}

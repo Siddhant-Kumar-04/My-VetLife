@@ -115,12 +115,12 @@ export default function RegisterPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
               <Stethoscope className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">Vetic</span>
+            <span className="text-xl font-bold text-foreground">Vetic-At-Home</span>
           </Link>
 
           <h1 className="text-2xl font-bold text-foreground">Create an account</h1>
           <p className="mt-2 text-muted-foreground">
-            Join Vetic to access quality pet healthcare
+            Join Vetic-At-Home to access quality pet healthcare from the comfort of your home.
           </p>
 
           {error && (
@@ -256,13 +256,13 @@ export default function RegisterPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="consultationFee">Consultation Fee ($)</Label>
+                    <Label htmlFor="consultationFee">Consultation Fee (₹)</Label>
                     <Input
                       id="consultationFee"
                       type="number"
                       min="0"
                       step="0.01"
-                      placeholder="75.00"
+                      placeholder="1000.00"
                       value={formData.consultationFee}
                       onChange={(e) => setFormData({ ...formData, consultationFee: e.target.value })}
                       required

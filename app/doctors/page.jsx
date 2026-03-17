@@ -214,7 +214,7 @@ export default function DoctorsPage() {
                     <div>
                       <span className="text-sm text-muted-foreground">Consultation Fee</span>
                       <p className="text-lg font-bold text-foreground">
-                        ${doctor.consultationFee || 0}
+                        ₹{doctor.consultationFee || 0}
                       </p>
                     </div>
                     <Button asChild>
