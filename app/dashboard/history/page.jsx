@@ -283,7 +283,7 @@ export default function HistoryPage() {
                 <p className="text-sm text-muted-foreground">Total Consultations</p>
               </div>
               <div className="rounded-lg bg-accent/20 p-4 text-center">
-                <p className="text-2xl font-bold text-foreground">${totalSpent.toFixed(0)}</p>
+                <p className="text-2xl font-bold text-foreground">₹{totalSpent.toFixed(0)}</p>
                 <p className="text-sm text-muted-foreground">Total Spent</p>
               </div>
               <div className="rounded-lg bg-muted p-4 text-center">
@@ -333,7 +333,7 @@ export default function HistoryPage() {
                 <div>
                   <p className="text-muted-foreground">Fee Paid</p>
                   <p className="font-medium">
-                    {selectedRecord.payment?.amount ? `$${selectedRecord.payment.amount}` : "—"}
+                    {selectedRecord.payment?.amount ? `₹${selectedRecord.payment.amount}` : "—"}
                   </p>
                 </div>
               </div>
