@@ -3,13 +3,13 @@ import User from "../models/User.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 
 const defaultDaySchedule = {
-  monday: { start: "09:00", end: "17:00", available: true },
-  tuesday: { start: "09:00", end: "17:00", available: true },
-  wednesday: { start: "09:00", end: "17:00", available: true },
-  thursday: { start: "09:00", end: "17:00", available: true },
-  friday: { start: "09:00", end: "17:00", available: true },
-  saturday: { start: "10:00", end: "14:00", available: false },
-  sunday: { start: "10:00", end: "14:00", available: false },
+  monday: { start: "00:00", end: "23:59", available: true },
+  tuesday: { start: "00:00", end: "23:59", available: true },
+  wednesday: { start: "00:00", end: "23:59", available: true },
+  thursday: { start: "00:00", end: "23:59", available: true },
+  friday: { start: "00:00", end: "23:59", available: true },
+  saturday: { start: "00:00", end: "23:59", available: true },
+  sunday: { start: "00:00", end: "23:59", available: true },
 };
 
 const normalizeAvailability = (
@@ -47,6 +47,24 @@ const normalizeAvailability = (
   }
 
   return normalized;
+};
+
+// Helper function to ensure all days are always 24/7 available
+const ensureAllDaysAvailability = (availability) => {
+  const updated = { ...availability };
+  
+  // Force all days to 24-hour availability
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  
+  days.forEach(day => {
+    updated[day] = {
+      start: "00:00",
+      end: "23:59",
+      available: true,
+    };
+  });
+  
+  return updated;
 };
 
 // @desc    Get all doctors
@@ -94,10 +112,18 @@ export const getDoctors = async (req, res, next) => {
       .populate("user", "name email phone avatar")
       .sort(sort);
 
+    // Ensure all days are always 24/7 available for all doctors
+    const doctorsWithFullAvailability = doctors.map(doc => {
+      if (doc.availability) {
+        doc.availability = ensureAllDaysAvailability(doc.availability);
+      }
+      return doc;
+    });
+
     res.status(200).json({
       success: true,
-      count: doctors.length,
-      data: doctors,
+      count: doctorsWithFullAvailability.length,
+      data: doctorsWithFullAvailability,
     });
   } catch (error) {
     next(error);
@@ -118,6 +144,11 @@ export const getDoctor = async (req, res, next) => {
       return next(
         new ErrorResponse(`Doctor not found with id of ${req.params.id}`, 404),
       );
+    }
+
+    // Ensure all days are always 24/7 available
+    if (doctor.availability) {
+      doctor.availability = ensureAllDaysAvailability(doctor.availability);
     }
 
     res.status(200).json({
@@ -141,6 +172,11 @@ export const getDoctorProfile = async (req, res, next) => {
 
     if (!doctor) {
       return next(new ErrorResponse("Doctor profile not found", 404));
+    }
+
+    // Ensure all days are always 24/7 available
+    if (doctor.availability) {
+      doctor.availability = ensureAllDaysAvailability(doctor.availability);
     }
 
     res.status(200).json({

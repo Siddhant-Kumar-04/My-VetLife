@@ -11,11 +11,35 @@ import {
   rateAppointment,
   updateLiveLocation,
   getLiveTracking,
+  deletePendingPaymentAppointment,
+  getDoctorReviews,
 } from "../controllers/appointmentController.js";
 import { protect, authorize } from "../middlewares/auth.js";
 
 const router = express.Router();
 
+// Public route to get booked slots for a doctor (no auth required)
+router.get("/doctor/:doctorId/booked-slots", async (req, res, next) => {
+  try {
+    const Appointment = (await import("../models/Appointment.js")).default;
+    const appointments = await Appointment.find({
+      doctor: req.params.doctorId,
+      status: { $nin: ["cancelled", "pending_payment"] }
+    }).select("appointmentDate appointmentTime");
+    
+    res.status(200).json({
+      success: true,
+      data: appointments
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Public route to get reviews for a doctor (no auth required)
+router.get("/doctor/:doctorId/reviews", getDoctorReviews);
+
+// All routes below require authentication
 router.use(protect);
 
 router
@@ -30,6 +54,7 @@ router
 
 router.put("/:id/status", authorize("doctor", "admin"), updateStatus);
 router.put("/:id/cancel", cancelAppointment);
+router.delete("/:id/cancel-payment", authorize("owner"), deletePendingPaymentAppointment);
 router.put("/:id/confirm", authorize("doctor"), confirmAppointment);
 router.put("/:id/complete", authorize("doctor"), completeAppointment);
 router.put("/:id/rate", authorize("owner"), rateAppointment);

@@ -33,6 +33,7 @@ import {
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/AuthContext"
+import PrescriptionModal from "@/components/PrescriptionModal"
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000"
 
@@ -62,6 +63,14 @@ export default function DoctorDashboardPage() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sharingId, setSharingId] = useState(null)   // appointmentId currently being GPS-shared
+
+  // Prescription modal state
+  const [prescriptionModal, setPrescriptionModal] = useState({
+    isOpen: false,
+    appointmentId: null,
+    petName: "",
+    ownerName: ""
+  })
 
   const socketRef  = useRef(null)
   const watchIdRef = useRef(null)   // navigator.geolocation watchPosition ID
@@ -164,6 +173,19 @@ export default function DoctorDashboardPage() {
 
   const handleLogout = async () => {
     await logout()
+  }
+
+  const handleOpenPrescription = (appointment) => {
+    setPrescriptionModal({
+      isOpen: true,
+      appointmentId: appointment._id,
+      petName: appointment.pet?.name,
+      ownerName: appointment.owner?.name
+    })
+  }
+
+  const handlePrescriptionSuccess = async () => {
+    await fetchDashboardData()
   }
 
   const filterAppointments = (status) => {
@@ -406,6 +428,18 @@ export default function DoctorDashboardPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-2">
+                        {/* Prescription button - show when in-progress */}
+                        {appointment.status === "in-progress" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            onClick={() => handleOpenPrescription(appointment)}
+                          >
+                            💊 Add Prescription
+                          </Button>
+                        )}
+
                         {/* GPS share toggle */}
                         {sharingId === appointment._id ? (
                           <Button
@@ -518,6 +552,16 @@ export default function DoctorDashboardPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Prescription Modal */}
+      <PrescriptionModal
+        isOpen={prescriptionModal.isOpen}
+        onClose={() => setPrescriptionModal({ ...prescriptionModal, isOpen: false })}
+        appointmentId={prescriptionModal.appointmentId}
+        petName={prescriptionModal.petName}
+        ownerName={prescriptionModal.ownerName}
+        onSuccess={handlePrescriptionSuccess}
+      />
     </div>
   )
 }

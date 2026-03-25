@@ -29,6 +29,7 @@ import {
   Stethoscope,
 } from "lucide-react"
 import { api } from "@/lib/api"
+import PrescriptionView from "@/components/PrescriptionView"
 
 export default function HistoryPage() {
   const [history, setHistory] = useState([])
@@ -353,23 +354,11 @@ export default function HistoryPage() {
               )}
 
               {selectedRecord.prescription?.medications?.length > 0 && (
-                <div className="rounded-md bg-muted/50 p-3">
-                  <p className="font-medium text-foreground mb-2">Prescriptions</p>
-                  <ul className="space-y-1">
-                    {selectedRecord.prescription.medications.map((med, i) => (
-                      <li key={i} className="text-muted-foreground">
-                        • <strong>{med.name}</strong>
-                        {med.dosage && ` — ${med.dosage}`}
-                        {med.frequency && ` — ${med.frequency}`}
-                        {med.duration && ` for ${med.duration}`}
-                      </li>
-                    ))}
-                  </ul>
-                  {selectedRecord.prescription.notes && (
-                    <p className="mt-2 text-muted-foreground italic">
-                      {selectedRecord.prescription.notes}
-                    </p>
-                  )}
+                <div className="mt-4">
+                  <PrescriptionView
+                    prescription={selectedRecord.prescription}
+                    appointment={selectedRecord}
+                  />
                 </div>
               )}
 

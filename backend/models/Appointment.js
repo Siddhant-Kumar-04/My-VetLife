@@ -34,7 +34,8 @@ const appointmentSchema = new mongoose.Schema(
     status: {
       type: String,
           enum: [
-          "pending",      // owner booked
+          "pending_payment", // awaiting payment confirmation
+          "pending",      // owner booked & paid
           "confirmed",    // legacy alias for accepted
           "accepted",     // doctor accepted
           "on-the-way",   // doctor started travel
@@ -43,7 +44,7 @@ const appointmentSchema = new mongoose.Schema(
           "completed",
           "cancelled",
        ],
-      default: "pending",
+      default: "pending_payment",
     },
     consultationType: {
       type: String,
@@ -89,6 +90,13 @@ const appointmentSchema = new mongoose.Schema(
       method: String,
       transactionId: String,
       paidAt: Date,
+      // Razorpay specific fields
+      razorpay: {
+        orderId: String,
+        paymentId: String,
+        signature: String,
+        refundId: String,
+      },
     },
     prescription: {
       medications: [

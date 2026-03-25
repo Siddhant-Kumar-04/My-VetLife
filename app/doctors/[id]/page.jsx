@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import RazorpayPaymentModal from "@/components/RazorpayPaymentModal"
 import {
   Select,
   SelectContent,
@@ -58,6 +59,15 @@ export default function DoctorProfilePage() {
   const [bookingError, setBookingError] = useState(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
 
+  // ── Payment modal ────────────────────────────────────────
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [currentAppointmentId, setCurrentAppointmentId] = useState(null)
+  const [appointmentDataForPayment, setAppointmentDataForPayment] = useState(null)
+
+  // ── Reviews ──────────────────────────────────────────────
+  const [reviews, setReviews] = useState([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+
   // ── Fetch doctor on mount ────────────────────────────────
   useEffect(() => {
     if (id) fetchDoctor()
@@ -74,6 +84,10 @@ export default function DoctorProfilePage() {
       setError(null)
       const response = await api.getDoctor(id)
       setDoctor(response.data)
+      // Fetch reviews right away
+      if (response.data) {
+        fetchReviews(response.data._id)
+      }
     } catch (err) {
       setError(err.message || "Failed to load doctor details")
     } finally {
@@ -93,12 +107,65 @@ export default function DoctorProfilePage() {
     }
   }
 
-  // ── Build available dates (next 14 days) from doctor schedule ──
+  const fetchReviews = async (doctorId) => {
+    try {
+      setReviewsLoading(true)
+      const response = await api.getDoctorReviews(doctorId)
+      setReviews(response.data || [])
+    } catch (err) {
+      console.error("Failed to fetch reviews:", err)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
+  // ── Fetch booked appointments for selected date ──────────
+  const [bookedSlots, setBookedSlots] = useState([])
+  
+  const fetchBookedSlots = async (dateStr) => {
+    try {
+      // Fetch booked slots for this doctor using public endpoint
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'}/appointments/doctor/${doctor._id}/booked-slots`
+      )
+      
+      if (!response.ok) {
+        console.error("Failed to fetch booked slots")
+        return
+      }
+      
+      const data = await response.json()
+      const appointments = data.data || []
+      
+      // Filter appointments for the selected date
+      const bookedOnDate = appointments
+        .filter(apt => {
+          const aptDate = new Date(apt.appointmentDate).toISOString().split('T')[0]
+          return aptDate === dateStr
+        })
+        .map(apt => apt.appointmentTime)
+      
+      setBookedSlots(bookedOnDate)
+    } catch (err) {
+      console.error("Failed to fetch booked slots:", err)
+    }
+  }
+
+  // ── Fetch booked slots when date changes ─────────────────
+  useEffect(() => {
+    if (selectedDate) {
+      fetchBookedSlots(selectedDate)
+    }
+  }, [selectedDate])
+
+  // ── Build ALL available dates (past and future) ──────────
   const getAvailableDates = () => {
     if (!doctor?.availability) return []
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
     const dates = []
-    for (let i = 1; i <= 14; i++) {
+    
+    // Show dates from 90 days in past to 90 days in future
+    for (let i = -90; i <= 90; i++) {
       const date = new Date()
       date.setDate(date.getDate() + i)
       const dayName = dayNames[date.getDay()]
@@ -115,29 +182,62 @@ export default function DoctorProfilePage() {
     return dates
   }
 
-  // ── Build 30-min time slots for selected date ────────────
+  // ── Build 15-min time slots for selected date ───────────
   const getTimeSlots = () => {
     if (!doctor?.availability || !selectedDate) return []
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-    // Use T12:00:00 to avoid UTC-offset shifting the date
-    const date = new Date(selectedDate + "T12:00:00")
-    const dayName = dayNames[date.getDay()]
+    
+    // Parse selected date
+    const selectedDateObj = new Date(selectedDate + "T00:00:00")
+    const dayName = dayNames[selectedDateObj.getDay()]
     const sched = doctor.availability[dayName]
+    
     if (!sched?.available || !sched.start || !sched.end) return []
 
     const [startH, startM] = sched.start.split(":").map(Number)
     const [endH, endM] = sched.end.split(":").map(Number)
     const slots = []
+    
+    // Get current date and time
+    const now = new Date()
+    const todayStr = now.getFullYear() + "-" + 
+                    (now.getMonth() + 1).toString().padStart(2, "0") + "-" + 
+                    now.getDate().toString().padStart(2, "0")
+    
+    // Generate 15-minute slots
     let h = startH, m = startM
-
     while (h < endH || (h === endH && m < endM)) {
       const h12 = h % 12 === 0 ? 12 : h % 12
       const ampm = h < 12 ? "AM" : "PM"
-      const label = `${h12}:${m.toString().padStart(2, "0")} ${ampm}`
-      slots.push({ value: label, label })
-      m += 30
-      if (m >= 60) { m = 0; h++ }
+      const timeStr = `${h12}:${m.toString().padStart(2, "0")} ${ampm}`
+      
+      // Check if slot is in the past (for today)
+      let isInPast = false
+      if (selectedDate === todayStr) {
+        const slotHour = h
+        const slotMin = m
+        const currentHour = now.getHours()
+        const currentMin = now.getMinutes()
+        
+        if (slotHour < currentHour || (slotHour === currentHour && slotMin <= currentMin)) {
+          isInPast = true
+        }
+      }
+      
+      // Check if slot is already booked
+      const isBooked = bookedSlots.includes(timeStr)
+      
+      // Add slot only if not in past and not booked
+      if (!isInPast && !isBooked) {
+        slots.push({ value: timeStr, label: timeStr })
+      }
+      
+      m += 15
+      if (m >= 60) { m = 0; h += 1 }
+      // Break if we've gone past the end time
+      if (h > endH) break
     }
+    
     return slots
   }
 
@@ -154,7 +254,7 @@ export default function DoctorProfilePage() {
     try {
       setBookingLoading(true)
       setBookingError(null)
-      await api.createAppointment({
+      const response = await api.createAppointment({
         doctor: doctor._id,
         pet: selectedPet,
         appointmentDate: selectedDate,
@@ -162,13 +262,35 @@ export default function DoctorProfilePage() {
         reason: reason.trim() + (notes.trim() ? `\n\nNotes: ${notes.trim()}` : ""),
         consultationType: "home-visit",
       })
-      setBookingSuccess(true)
-      setTimeout(() => router.push("/dashboard/appointments"), 2000)
+      
+      // Store appointment data for payment modal
+      const selectedPetData = pets.find(p => p._id === selectedPet)
+      setCurrentAppointmentId(response.data._id)
+      setAppointmentDataForPayment({
+        appointmentId: response.data._id,
+        doctorName: doctor.user?.name || doctor.name,
+        petName: selectedPetData?.name,
+        appointmentDate: selectedDate,
+        appointmentTime: selectedTime,
+        amount: doctor.consultationFee || 0,
+        ownerName: "", // Will be fetched from context
+        ownerEmail: "", // Will be fetched from context
+        ownerPhone: "", // Will be fetched from context
+      })
+      
+      // Show payment modal
+      setShowPaymentModal(true)
     } catch (err) {
       setBookingError(err.message || "Failed to book appointment. Please try again.")
-    } finally {
       setBookingLoading(false)
     }
+  }
+
+  // ── Handle successful payment ────────────────────────────
+  const handlePaymentSuccess = (appointment) => {
+    setBookingSuccess(true)
+    setBookingLoading(false)
+    setTimeout(() => router.push("/dashboard/appointments"), 2000)
   }
 
 
@@ -329,31 +451,111 @@ export default function DoctorProfilePage() {
             {doctor.availability && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Weekly Availability</CardTitle>
+                  <CardTitle>Weekly Availability (24/7)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {Object.entries(doctor.availability).map(([day, s]) => (
-                      <div
-                        key={day}
-                        className={`rounded-lg p-3 text-center text-sm ${
-                          s.available
-                            ? "bg-primary/10 text-primary"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <p className="font-medium capitalize">{day}</p>
-                        {s.available ? (
-                          <p className="text-xs">{s.start} – {s.end}</p>
-                        ) : (
-                          <p className="text-xs">Off</p>
-                        )}
-                      </div>
-                    ))}
+                    {Object.entries(doctor.availability).map(([day, s]) => {
+                      // Check if it's 24-hour availability
+                      const is24Hours = s.start === "00:00" && (s.end === "23:59" || s.end === "24:00");
+                      
+                      return (
+                        <div
+                          key={day}
+                          className={`rounded-lg p-3 text-center text-sm font-medium ${
+                            s.available
+                              ? "bg-green-100 text-green-700 border border-green-300"
+                              : "bg-gray-100 text-gray-600 border border-gray-300"
+                          }`}
+                        >
+                          <p className="capitalize font-semibold mb-1">{day}</p>
+                          {s.available ? (
+                            <p className="text-xs">
+                              {is24Hours ? "24 Hours" : `${s.start} – ${s.end}`}
+                            </p>
+                          ) : (
+                            <p className="text-xs">Off</p>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* Reviews Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Patient Reviews</CardTitle>
+                <CardDescription>
+                  {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {reviewsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="rounded-lg bg-muted p-6 text-center">
+                    <Star className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      No reviews yet. Be the first to review!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.slice(0, 5).map((review) => {
+                      const date = new Date(review.createdAt);
+                      const formattedDate = date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      });
+
+                      return (
+                        <div key={review._id} className="border-b pb-4 last:border-b-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                                {review.userName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">{review.userName}</p>
+                                <p className="text-xs text-muted-foreground">{formattedDate}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${
+                                    i < review.rating
+                                      ? 'fill-accent text-accent'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          {review.review && (
+                            <p className="mt-2 text-sm text-muted-foreground italic">
+                              "{review.review}"
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {reviews.length > 5 && (
+                      <p className="text-center text-xs text-muted-foreground pt-2">
+                        +{reviews.length - 5} more {reviews.length - 5 === 1 ? 'review' : 'reviews'}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* ── Booking Card (right 1/3) ───────────────────── */}
@@ -439,37 +641,25 @@ export default function DoctorProfilePage() {
                   )}
                 </div>
 
-                {/* Select Date */}
+                {/* Select Date - Calendar Picker */}
                 <div className="space-y-1.5">
                   <Label>
                     Select Date <span className="text-destructive">*</span>
                   </Label>
-                  <Select
-                    value={selectedDate}
-                    onValueChange={(v) => {
-                      setSelectedDate(v)
-                      setSelectedTime("")
-                    }}
-                    disabled={!isAuthenticated || bookingSuccess}
-                  >
-                    <SelectTrigger>
-                      <Calendar className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Choose a date" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableDates.length === 0 ? (
-                        <SelectItem value="_none" disabled>
-                          No available dates in next 14 days
-                        </SelectItem>
-                      ) : (
-                        availableDates.map((d) => (
-                          <SelectItem key={d.value} value={d.value}>
-                            {d.label}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => {
+                        setSelectedDate(e.target.value)
+                        setSelectedTime("")
+                      }}
+                      disabled={!isAuthenticated || bookingSuccess}
+                      className="pl-10"
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
                 </div>
 
                 {/* Select Time */}
@@ -559,6 +749,17 @@ export default function DoctorProfilePage() {
           </div>
         </div>
       </main>
+
+      <RazorpayPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false)
+          setCurrentAppointmentId(null)
+        }}
+        appointmentId={currentAppointmentId}
+        appointmentData={appointmentDataForPayment}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
 
       <Footer />
     </div>

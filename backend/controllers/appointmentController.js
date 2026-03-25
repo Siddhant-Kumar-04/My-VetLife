@@ -6,7 +6,8 @@ import ErrorResponse from "../utils/ErrorResponse.js";
 // pending → accepted → on-the-way → arrived → in-progress → completed
 // Any non-terminal state can also → cancelled
 const STATUS_TRANSITIONS = {
-  pending: ["accepted", "cancelled"],
+  pending_payment: ["pending", "cancelled"], // payment pending → paid or cancelled
+  pending: ["accepted", "cancelled"],         // paid, awaiting doctor acceptance
   accepted: ["on-the-way", "cancelled"],
   "on-the-way": ["arrived", "cancelled"],
   arrived: ["in-progress", "cancelled"],
@@ -30,6 +31,8 @@ export const getAppointments = async (req, res, next) => {
         return next(new ErrorResponse("Doctor profile not found", 404));
       }
       query.doctor = doctor._id;
+      // Doctors should not see pending_payment appointments (not paid yet)
+      query.status = { $ne: "pending_payment" };
     }
 
     // Filter by status
@@ -643,6 +646,85 @@ export const getLiveTracking = async (req, res, next) => {
           liveLocation: isLive ? appointment.tracking.livelocation : null,
         },
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete pending payment appointment (when user cancels payment)
+// @route   DELETE /api/appointments/:id/cancel-payment
+// @access  Private (Owner)
+export const deletePendingPaymentAppointment = async (req, res, next) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return next(
+        new ErrorResponse(
+          `Appointment not found with id of ${req.params.id}`,
+          404,
+        ),
+      );
+    }
+
+    // Check authorization - only owner can delete pending payment appointments
+    if (appointment.owner.toString() !== req.user.id) {
+      return next(
+        new ErrorResponse("Not authorized to cancel this appointment", 401),
+      );
+    }
+
+    // Can only delete if status is pending_payment
+    if (appointment.status !== "pending_payment") {
+      return next(
+        new ErrorResponse(
+          "Can only delete appointments that are awaiting payment",
+          400,
+        ),
+      );
+    }
+
+    // Delete the appointment
+    await Appointment.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Appointment cancelled and deleted",
+      data: {},
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all reviews for a doctor (PUBLIC)
+// @route   GET /api/appointments/doctor/:doctorId/reviews
+// @access  Public
+export const getDoctorReviews = async (req, res, next) => {
+  try {
+    const appointments = await Appointment.find({
+      doctor: req.params.doctorId,
+      "rating.value": { $exists: true },
+      status: "completed"
+    })
+      .populate("owner", "name avatar")
+      .select("rating owner createdAt")
+      .sort({ "rating.createdAt": -1 });
+
+    const reviews = appointments.map(apt => ({
+      _id: apt._id,
+      rating: apt.rating.value,
+      review: apt.rating.review,
+      userName: apt.owner?.name || "Anonymous",
+      userAvatar: apt.owner?.avatar,
+      createdAt: apt.rating.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: reviews,
     });
   } catch (error) {
     next(error);

@@ -14,6 +14,7 @@ import doctorRoutes from "./routes/doctorRoutes.js";
 import petRoutes from "./routes/petRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 // Load env variables
 dotenv.config();
@@ -114,6 +115,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/pets", petRoutes);
 app.use("/api/appointments", appointmentRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Health check
